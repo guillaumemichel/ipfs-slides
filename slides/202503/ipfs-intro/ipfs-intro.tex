@@ -1,0 +1,411 @@
+\documentclass{../shipyard-slide}
+
+\usepackage[british]{babel}
+\usepackage[british]{datetime2}
+\usepackage{amsmath}
+\usepackage{amssymb}
+\usepackage{ulem}
+\usepackage{qrcode}
+\usepackage{twemojis}
+\usepackage{wasysym}
+
+\usepackage{tikz,calc}
+\usetikzlibrary{shapes, shapes, arrows, chains, fit, quotes}
+
+\tikzstyle{trienode} = [draw=text-color, rounded corners]
+\tikzstyle{bucket} = [draw=text-color, rectangle]
+
+\settheme{shipyard-2025}
+
+%Information to be included in the title page:
+\title{Introduction to IPFS}
+\subtitle{Web Verifiability through Content Addressing}
+\author{Guillaume Michel}
+\avatar{../resources/avatar.jpg}
+\handle{@guissou}
+\institute{Interplanetary Shipyard}
+\event{Privacy x Verifiability Conference - EPFL}
+\date{\DTMdate{2025-03-07}}
+
+\begin{document}
+
+\frame{\titlepage}
+
+\logo{
+	\vspace{7.2cm}
+	\includegraphics[scale=.16]{../shipyard-resources/shipyard-symbol-white-trans-bg.png}
+	\hspace{4em}
+}
+
+\begin{frame}
+  \frametitle{Why verifiability matters}
+  \begin{itemize}
+    \itemc Trust \& Transparency
+    \itemc Security \& Accountability
+    \itemc DApps Resilience
+  \end{itemize}
+
+  \begin{columns}
+  \begin{column}{.63\textwidth}
+  \begin{itemize}
+    \item[\greencube] Recent example: ByBit hack
+  \end{itemize}
+  \end{column}
+  \begin{column}{.30\textwidth}
+    \begin{center}
+    \qrcode{https://blog.ipfs.tech/2025-could-ipfs-prevent-bybit-hack/}\\
+    \medskip
+    {\footnotesize \textit{Could IPFS have prevented the Bybit hack?}}
+  \end{center}
+  \end{column}
+  \end{columns}
+
+%       Set the Stage:
+%         Traditional web addresses data by location (e.g., URLs).
+%         This approach makes content integrity and resilience more challenging (links can break, data can be changed without notice).
+%         Growing concerns about misinformation, censorship, and reliability of web content.
+%     Introduce the Concept of Verifiability:
+%         The ability to cryptographically verify data.
+%         Ensures that what you’re retrieving is exactly what was intended by the publisher.
+%
+% Tip: Use real-world examples (e.g., content takedowns, link rot, or ephemeral data) to highlight the importance of verifiability.
+\end{frame}
+
+\begin{frame}
+  \frametitle{Agenda}
+  \begin{enumerate}
+    \item What is IPFS?
+    \item Content Addressing
+    \item Content Routing
+    \item IPFS on the Web
+    \item Common Misconceptions
+  \end{enumerate}
+\end{frame}
+
+% \begin{frame}
+% \frametitle{What is IPFS?}
+% \begin{columns}
+% \begin{column}{0.59\textwidth}
+%   \begin{itemize}
+%     \itemc IPFS = \textbf{I}nter\textbf{P}lanetary \textbf{F}ile\textbf{S}ystem
+%     \itemc Peer-to-peer hypermedia protocol for content addressing
+%     \itemc Aims to make the web faster, safer, and more open
+%     \itemc Does IPFS have a blockchain? No.
+%     \begin{itemize}
+%       \item \url{https://doesipfshaveablockchain.com}
+%     \end{itemize}
+%   \end{itemize}
+% \end{column}
+% \begin{column}{0.35\textwidth}
+%   \textbf{Key Properties}
+%   \begin{enumerate}
+%     \item Decentralized
+%     \item Content Addressing
+%     \item Merkle DAGs
+%     \item Resilience
+%     \item Censorship Resistance
+%   \end{enumerate}
+% \end{column}
+% \end{columns}
+%
+% \end{frame}
+
+\begin{frame}
+\frametitle{What is IPFS?}
+\begin{columns}
+  \begin{column}{.7\linewidth}
+  \begin{itemize}
+    \itemc IPFS = \textbf{I}nter\textbf{P}lanetary \textbf{F}ile\textbf{S}ystem
+    \itemc Peer-to-peer hypermedia protocol for content addressing
+    \itemc Aims to make the web faster, safer, and more open
+    \itemc Does IPFS have a blockchain? No.
+    \begin{itemize}
+      \item \url{https://doesipfshaveablockchain.com}
+    \end{itemize}
+  \end{itemize}
+\end{column}
+\begin{column}{.25\linewidth}
+  \includegraphics[width=\linewidth]{resources/ipfs-logo.png}
+\end{column}
+\end{columns}
+\end{frame}
+
+% \begin{frame}
+%   \frametitle{IPFS Key Properties}
+% \begin{enumerate}
+%   \item Decentralized
+%   \item Content Addressing
+%   \item Merkle DAGs
+%   \item Resilience
+%   \item Censorship Resistance
+% \end{enumerate}
+%
+% \end{frame}
+
+\begin{frame}
+  \frametitle{Location Addressing vs Content Addressing}
+  
+\begin{center}
+  \renewcommand{\arraystretch}{1.5}
+  {\small
+  \begin{tabular}{|p{.45\linewidth}|p{.45\linewidth}|}
+  \hline
+  \large\textbf{Location Addressing} & \large\textbf{Content Addressing} \\ \hline
+  \textit{Where is the data} & \textit{What is the data?} \\ \hline
+  Uniform Resource Locator (URL) & Content Identifier (CID) \\
+  \texttt{https://example.com/foo/bar.jpg} & \texttt{bafybeihfg3d7rdltd43u3tfvn...uc7y} \\ \hline
+  Server down? The data is unreachable & Anyone can serve the same data \\ \hline
+  Limited verifiability — trust the server to provide correct data & Full verifiability — if content changes, CID changes \\ \hline
+  Censor-prone — block IP or domain name & Hard to censor — all providers must be blocked \\ \hline
+  \end{tabular}
+  }
+\end{center}
+\end{frame}
+
+\begin{frame}
+  \frametitle{Content Identifiers (CIDs)}
+  \begin{itemize}
+    \itemc Immutable, self certifying name
+    \itemc Made of hash and meta data
+  \end{itemize}
+  \bigskip
+  \includegraphics[width=\linewidth]{resources/cid-composition.png}
+  {\small source: \url{cid.ipfs.tech}}
+\end{frame}
+
+
+\begin{frame}
+  \frametitle{Merkle DAG}
+  \begin{center}
+  \includegraphics[width=.7\linewidth]{resources/file.png}
+  \end{center}
+\end{frame}
+\begin{frame}
+  \frametitle{Merkle DAG}
+  \begin{center}
+  \includegraphics[width=.7\linewidth]{resources/chunks.png}
+  \end{center}
+\end{frame}
+\begin{frame}
+  \frametitle{Merkle DAG}
+  \begin{center}
+  \includegraphics[width=.7\linewidth]{resources/dag.png}
+  \end{center}
+\end{frame}
+\begin{frame}
+  \frametitle{Merkle DAG}
+  \begin{center}
+  \includegraphics[width=.7\linewidth]{resources/cid.png}
+  \end{center}
+\end{frame}
+
+\begin{frame}
+  \frametitle{libp2p}
+  \begin{itemize}
+    \itemc Open source peer-to-peer networking library
+    \itemc Peer ID: unique peer identifier derived from public key (\texttt{12D3KooWN1Mr...})
+    \itemc Transports: \texttt{tcp}, \texttt{quic}, \texttt{wss}, \texttt{webrtc}, \texttt{webtransport}
+    \itemc Encrypted by default
+    \itemc Features: Holepunching, Relays, Kademlia DHT, Gossipsub, etc.
+    \itemc Networking layer of IPFS, Ethereum, Polkadot, Filecoin, etc.
+  \end{itemize}
+  \begin{tikzpicture}[remember picture, overlay]
+    \node[anchor=south east, xshift=-0.7cm, yshift=0.5cm] at (current page.south east)
+    {\includegraphics[width=.15\linewidth]{resources/libp2p.png}};
+  \end{tikzpicture}
+\end{frame}
+
+
+\begin{frame}
+  \frametitle{Content Routing}
+  \begin{center}
+    \includegraphics[width=.7\textwidth]{resources/routing-add.png}
+  \end{center}
+\end{frame}
+\begin{frame}
+  \frametitle{Content Routing}
+  \begin{center}
+    \includegraphics[width=.7\textwidth]{resources/routing-provide.png}
+  \end{center}
+\end{frame}
+\begin{frame}
+  \frametitle{Content Routing}
+  \begin{center}
+    \includegraphics[width=.7\textwidth]{resources/routing-lookup-bob.png}
+  \end{center}
+\end{frame}
+\begin{frame}
+  \frametitle{Content Routing}
+  \begin{center}
+    \includegraphics[width=.7\textwidth]{resources/routing-peer-lookup.png}
+  \end{center}
+\end{frame}
+\begin{frame}
+  \frametitle{Content Routing}
+  \begin{center}
+    \includegraphics[width=.7\textwidth]{resources/routing-transfer-firewall.png}
+  \end{center}
+\end{frame}
+\begin{frame}
+  \frametitle{Content Routing}
+  \begin{center}
+    \includegraphics[width=.7\textwidth]{resources/routing-verification.png}
+  \end{center}
+\end{frame}
+\begin{frame}
+  \frametitle{Content Routing}
+  \begin{center}
+    \includegraphics[width=.7\textwidth]{resources/routing-provide-bob.png}
+  \end{center}
+\end{frame}
+\begin{frame}
+  \frametitle{Content Routing}
+  \begin{center}
+    \includegraphics[width=.7\textwidth]{resources/routing-lookup-charlie.png}
+  \end{center}
+\end{frame}
+\begin{frame}
+  \frametitle{Content Routing}
+  \begin{center}
+    \includegraphics[width=.7\textwidth]{resources/routing-transfer-charlie.png}
+  \end{center}
+\end{frame}
+\begin{frame}
+  \frametitle{Content Routing}
+  \begin{center}
+    \includegraphics[width=.7\textwidth]{resources/routing-no-providers.png}
+  \end{center}
+\end{frame}
+\begin{frame}
+  \frametitle{Content Routing}
+  \begin{center}
+    \includegraphics[width=.7\textwidth]{resources/routing-ipni.png}
+  \end{center}
+\end{frame}
+
+
+\begin{frame}
+  \frametitle{Bridging the Web: IPFS HTTP Gateways}
+  \begin{itemize}
+    \itemc Browsers have limited connectivity:
+    \begin{itemize}
+      \item[\greencube] \texttt{wss}
+      \item[\greencube] \texttt{webrtc}
+      \item[\greencube] \texttt{webtransport} (WIP)
+    \end{itemize}
+    \itemc HTTP can be used for data retrieval!
+  \end{itemize}
+\end{frame}
+\begin{frame}
+  \frametitle{Bridging the Web: IPFS HTTP Gateways}
+  \begin{center}
+    \includegraphics[width=.7\textwidth]{resources/routing-gateway.png}
+  \end{center}
+\end{frame}
+\begin{frame}
+  \frametitle{Bridging the Web: IPFS HTTP Gateways}
+  \begin{itemize}
+    \itemc HTTP Gateways (\href{https://ipfs.io}{ipfs.io}, \href{https://dweb.link}{dweb.link})
+    \begin{itemize}
+      \item[\greencube] \texttt{GET /ipfs/\{cid\}}
+      \item[\greencube] Gateway must be trusted
+    \end{itemize}
+    \itemc Trustless gateways (\url{inbrowser.dev})
+    \begin{itemize}
+      \item[\greencube] Data verified in Service Worker
+      \item[\greencube] Uses Helia verified fetch
+    \end{itemize}
+    \itemc Next Steps
+    \begin{itemize}
+      \item[\greencube] Delegated Routing
+      \item[\greencube] Fetch from source
+    \end{itemize}
+  \end{itemize}
+\end{frame}
+
+\begin{frame}
+  \frametitle{Common Misconceptions}
+  \begin{columns}
+    \begin{column}{.38\textwidth}
+  \begin{enumerate}
+    \item Uploading files to IPFS
+    \item Permanent data storage
+    \item Data replication
+    \item IPFS fully replaces HTTP
+    \item Privacy
+  \end{enumerate}
+\end{column}
+\begin{column}{.5\textwidth}
+  \includegraphics[width=\textwidth]{resources/ipfs-upload.png}
+\end{column}
+\end{columns}
+\end{frame}
+
+\begin{frame}
+  \frametitle{Shipyard}
+  \begin{columns}
+    \begin{column}{.8\textwidth}
+  \begin{itemize}
+    \itemc Engineering collective stewarding IPFS \& libp2p
+    \begin{itemize}
+      \item[\greencube] We \twemoji{red heart} Open Source
+      \item[\greencube] Graduated from Protocol Labs in 2024
+    \end{itemize}
+    \itemc Championing IPFS \& libp2p specs
+    \itemc Developping \& maintaining \href{https://github.com/ipfs/kubo}{kubo}, \href{https://github.com/ipfs/helia}{helia}, \href{https://github.com/libp2p/go-libp2p}{go-libp2p}, \href{https://github.com/libp2p/js-libp2p}{js-libp2p} and associated tooling
+    \itemc Operating IPFS Gateways (\href{https://ipfs.io}{ipfs.io}) and DHT Bootstrappers
+    \itemc Open for collaborations and supporting your IPFS use cases
+    \begin{itemize}
+      \item[\greencube] \href{mailto:contact@ipshipyard.com}{contact@ipshipyard.com}
+    \end{itemize}
+  \end{itemize}
+  \end{column}
+  \begin{column}{.18\textwidth}
+    \begin{center}
+    \qrcode{https://ipshipyard.com}\\
+    \smallskip
+    {\tiny \href{https://ipshipyard.com}{https://ipshipyard.com}}\\
+    \bigskip
+    \includegraphics[width=.7\textwidth]{../shipyard-resources/shipyard-vertical-white-trans-bg.png}
+    \end{center}
+  \end{column}
+  \end{columns}
+  \end{frame}
+
+\begin{frame}
+\frametitle{Q\&A}
+
+\begin{columns}[onlytextwidth]
+	\begin{column}{0.69\textwidth}
+	\begin{columns}[onlytextwidth]
+	\begin{column}{.2\textwidth}
+		\tikz\node [circle, minimum width = \linewidth,
+			path picture = {
+      			\node [] at (path picture bounding box.center) {
+        				\includegraphics[width=\linewidth]{../resources/avatar.jpg}
+        			};
+    		}] {};
+	\end{column}
+	\begin{column}{.78\textwidth}
+		{\Large Guillaume Michel (@guissou)}
+	\end{column}
+	\end{columns}
+	\vspace{1cm}
+	\begin{itemize}
+    \itemc Github: \href{https://github.com/guillaumemichel}{\textbf{@guillaumemichel}}
+    \itemc Email: \href{mailto:guillaume@ipshipyard.com}{guillaume@ipshipyard.com}
+    \itemc Website: \url{https://ipshipyard.com}
+	\end{itemize}
+
+	\end{column}
+	\begin{column}{0.29\textwidth}
+		\begin{center}
+			\qrcode[height=3cm]{https://ipfs.io/ipns/k51qzi5uqu5dk4kbd5bpmklj30q0q8n3091bncahugkx18e84p1od2rk25olsd}\\
+			\smallskip
+			{\small Slides available on IPFS}
+		\end{center}
+	\end{column}
+\end{columns}
+
+\end{frame}
+\end{document}

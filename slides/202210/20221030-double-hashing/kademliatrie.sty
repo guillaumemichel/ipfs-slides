@@ -1,0 +1,165 @@
+
+\NeedsTeXFormat{LaTeX2e}
+\ProvidesPackage{kademliatrie}[Kademlia Trie Structure Generator package 20221019]
+
+\RequirePackage{tikz}
+
+\RequirePackage{pgffor}
+\RequirePackage{ifthen}
+
+% parameter ideas: depth, node style, keys in the trie
+\newcommand\newtrie[1]{
+	\def\depth{#1}
+	% all there must be a different node object for each leaf
+	% all positions have to be set from the start
+	% then the links have to be created
+	
+	\begin{tikzpicture}[
+		thick
+	]
+	
+	\node{root}
+	child {
+		\subtrie{1}{0}
+	}
+	;
+	\end{tikzpicture}
+	%\subtrie{}{1}
+}
+
+\def\one{1}
+
+\newcommand\subtrie[2]{
+	\ifthenelse{\equal{#2}{0}}{
+		node \{#1\}
+	}{
+			node \{#1 \} \\
+			child \{ \\
+				\subtrie{#1 0}{\the\numexpr#2 -1\relax}
+		\}
+	}
+	
+\iffalse
+	\def\prefix{#1}
+	\def\counter{#2}
+	
+	% if counter is 0
+	\ifthenelse{\equal{\counter}{0}}{
+		node \{\prefix \}
+	}{
+		\def\ncounter{\the\numexpr\counter-1\relax}
+		child \{ \\
+			node \{\prefix \} \\
+			child \{ \\
+				\subtrie[\prefix 0][\ncounter]
+			\} \\
+		\} \\
+	}
+\fi
+}
+
+\newcommand\statictrie{
+\begin{tikzpicture}[
+	thick,
+	scale=0.8,
+  	every node/.style={scale=0.8},
+    level 1/.style = {sibling distance=8.8cm},
+    level 2/.style = {sibling distance=4.4cm},
+    level 3/.style = {sibling distance=2.2cm},
+    level 4/.style = {sibling distance=1.1cm},
+    level distance = 1.5cm
+]
+ 	\node[trienode] {root}
+	child {
+		node[trienode] {0}
+		child {
+			node[trienode] {00}
+			child {
+				node[trienode] {000}
+				child {
+					node[trienode] {0000}
+				}
+				child {
+					node[trienode] {0001}
+				}
+			}
+			child {
+				node[trienode] {001}
+				child {
+					node[trienode] {0010}
+				}
+				child {
+					node[trienode] {0011}
+				}
+			}
+		}
+		child {
+			node[trienode] {01}
+			child {
+				node[trienode] {010}
+				child {
+					node[trienode] {0100}
+				}
+				child {
+					node[trienode] {0101}
+				}
+			}
+			child {
+				node[trienode] {011}
+				child {
+					node[trienode] {0110}
+				}
+				child {
+					node[trienode] {0111}
+				}
+			}
+		}
+	}
+	child {
+		node[trienode] {1}
+		child {
+			node[trienode] {10}
+			child {
+				node[trienode] {100}
+				child {
+					node[trienode] {1000}
+				}
+				child {
+					node[trienode] {1001}
+				}
+			}
+			child {
+				node[trienode] {101}
+				child {
+					node[trienode] {1010}
+				}
+				child {
+					node[trienode] {1011}
+				}
+			}
+		}
+		child {
+			node[trienode] {11}
+			child {
+				node[trienode] {110}
+				child {
+					node[trienode] {1100}
+				}
+				child {
+					node[trienode] {1101}
+				}
+			}
+			child {
+				node[trienode] {111}
+				child {
+					node[trienode] {1110}
+				}
+				child {
+					node[trienode] {1111}
+				}
+			}
+		}
+	}
+  ;
+\end{tikzpicture}
+}

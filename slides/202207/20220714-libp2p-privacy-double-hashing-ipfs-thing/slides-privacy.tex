@@ -1,0 +1,1702 @@
+\documentclass{pl-slide}
+
+\usepackage[british]{babel}
+\usepackage[british]{datetime2}
+\usepackage{ulem}
+
+\usepackage{tikz,calc}
+\usetikzlibrary{shapes}
+
+\usetikzlibrary{shapes.geometric, shapes.multipart, arrows, chains, fit, quotes}
+
+%Information to be included in the title page:
+%\title{Content Routing Privacy: Double Hashing}
+%\subtitle{Double Privacy Benefits of Double Hashing}
+%\title{Double Privacy Benefits of Double Hashing}
+\title{Making use of Double Hashing for Privacy}
+
+\author{Guillaume Michel}
+\handle{@guissou}
+\group{ProbeLab}
+\institute{Protocol Labs}
+\event{IPFS þing}
+\date{\DTMdate{2022-07-14}}
+
+\tikzstyle{dhtnode} = [rectangle, rounded corners, minimum width=3cm, minimum height=1cm, text centered, draw=graylight]
+
+\tikzstyle{trienode} = [draw=graylight, rounded corners]
+
+\tikzset{
+state/.style={
+       rectangle split,
+       rectangle split parts=2,
+       rounded corners,
+       line width=1pt,
+       draw=graylight,
+       minimum height=10em,
+       minimum width=15em,
+       text width=14em,
+       inner sep=2pt,
+       text centered,
+       }
+}
+
+\tikzset{
+  basic box/.style = {
+    shape = rectangle,
+    align = center,
+    draw  = #1,
+    fill  = #1!25,
+    rounded corners},
+  header node/.style = {
+    %Minimum Width = header nodes,
+    font          = \strut\Large\ttfamily,
+    text depth    = +0pt,
+    fill          = white,
+    draw},
+  header/.style = {%
+    inner ysep = +1.5em,
+    append after command = {
+      \pgfextra{\let\TikZlastnode\tikzlastnode}
+      node [header node] (header-\TikZlastnode) at (\TikZlastnode.north) {#1}
+      node at (0,0) (h-\TikZlastnode) {}
+    }
+  },
+  hv/.style = {to path = {-|(\tikztotarget)\tikztonodes}},
+  vh/.style = {to path = {|-(\tikztotarget)\tikztonodes}},
+  fat blue line/.style = {ultra thick, blue}
+}
+
+
+\begin{document}
+
+
+\frame{\titlepage}
+
+\begin{frame}
+\frametitle{Work from the libp2p privacy discussion group}
+\begin{itemize}
+	\item Yiannis Psaras - Protocol Labs
+	\item Will Scott - Protocol Labs
+	\item Srivatsan Sridhar - Stanford University
+	\item Guillaume Michel - Protocol Labs
+	\item Florian Tschorsch - TU Berlin
+	\item Erik Daniel - TU Berlin
+	\item Elizabeth Binks - Chainsafe
+\end{itemize}
+\end{frame}
+
+\begin{frame}
+\frametitle{Double Hashing in IPFS}
+
+{\huge
+Hash(\includegraphics[scale=0.06]{logos/image.png}) $\rightarrow$ \texttt{0010011101100100111000110}\\
+\bigskip
+\texttt{CID} $\rightarrow$ \texttt{bafybeiaqr6csdcnxrkpx23oithpjt}\\
+\bigskip
+\texttt{Hash(CID)} $\rightarrow$ \texttt{111010000011001011110101}
+}
+\end{frame}
+
+\begin{frame}
+\frametitle{IPFS content lookup (simplified)}
+\begin{tikzpicture}[
+  thick,
+  minimum size=5mm,
+  node distance=0.7cm and 3cm,
+  >=stealth,
+  bend angle=45,
+  scale=0.9,
+  every node/.style={scale=0.9},
+  auto
+]
+\node (client)  [rounded corners, align=center, draw=graylight,
+             label=above:\textbf{Client}] {
+             	\begin{minipage}[t][6.4cm]{5.8cm}
+				Request CID \texttt{bafybeif6u5pukl3sze}\\
+				\texttt{Hash(CID)=0010101000101111}\\
+				Closest peer to \texttt{Hash(CID)}: \texttt{Peer0}\\
+				\end{minipage}
+             };
+             
+\end{tikzpicture}
+\end{frame}
+
+\begin{frame}
+\frametitle{IPFS content lookup (simplified)}
+\begin{tikzpicture}[
+  thick,
+  minimum size=5mm,
+  node distance=0.7cm and 3cm,
+  >=stealth,
+  bend angle=45,
+  scale=0.9,
+  every node/.style={scale=0.9},
+  auto
+]
+\node (client)  [rounded corners, align=center, draw=graylight,
+             label=above:\textbf{Client}] {
+             	\begin{minipage}[t][6.4cm]{5.8cm}
+				Request CID \texttt{bafybeif6u5pukl3sze}\\
+				\texttt{Hash(CID)=0010101000101111}\\
+				Closest peer to \texttt{Hash(CID)}: \texttt{Peer0}\\
+				\end{minipage}
+             };
+             
+\node (peer0)  [rounded corners, text width=5.7cm, align=center, draw=graylight, right=of client.north east, anchor=north west,
+             label=above:\textbf{Peer0}] {
+			\texttt{Hash(CID)=0010101000101111}\\
+			Closest peer to \texttt{Hash(CID)}: \texttt{Peer1}
+             };
+
+             
+
+\draw[->, thick] ([yshift=0.3cm] client.east |- peer0.west) -- node[midway, above]{\texttt{Req(CID)}} ([yshift=0.3cm] peer0.west);
+\draw[->, thick] ([yshift=-0.3cm] peer0.west) -- node[midway, above]{\texttt{Peer1}} ([yshift=-0.3cm] client.east |-peer0.west);
+
+\end{tikzpicture}
+\end{frame}
+
+\begin{frame}
+\frametitle{IPFS content lookup (simplified)}
+\begin{tikzpicture}[
+  thick,
+  minimum size=5mm,
+  node distance=0.7cm and 3cm,
+  >=stealth,
+  bend angle=45,
+  scale=0.9,
+  every node/.style={scale=0.9},
+  auto
+]
+\node (client)  [rounded corners, align=center, draw=graylight,
+             label=above:\textbf{Client}] {
+             	\begin{minipage}[t][6.4cm]{5.8cm}
+				Request CID \texttt{bafybeif6u5pukl3sze}\\
+				\texttt{Hash(CID)=0010101000101111}\\
+				Closest peer to \texttt{Hash(CID)}: \texttt{Peer0}\\
+				\end{minipage}
+             };
+             
+\node (peer0)  [rounded corners, text width=5.7cm, align=center, draw=graylight, right=of client.north east, anchor=north west,
+             label=above:\textbf{Peer0}] {
+			\texttt{Hash(CID)=0010101000101111}\\
+			Closest peer to \texttt{Hash(CID)}: \texttt{Peer1}
+             };
+             
+             
+
+\node (peer1)  [rounded corners, text width=5.7cm, minimum height=1cm, align=center, draw=graylight, below = of peer0,
+             label=above:\textbf{Peer1}] {
+			\texttt{Hash(CID)=0010101000101111}\\
+			Closest peer to \texttt{Hash(CID)}: \texttt{Peer2}
+             };
+
+             
+
+\draw[->, thick] ([yshift=0.3cm] client.east |- peer0.west) -- node[midway, above]{\texttt{Req(CID)}} ([yshift=0.3cm] peer0.west);
+\draw[->, thick] ([yshift=-0.3cm] peer0.west) -- node[midway, above]{\texttt{Peer1}} ([yshift=-0.3cm] client.east |-peer0.west);
+
+\draw[->, thick] ([yshift=0.3cm] client.east |- peer1.west) -- node[midway, above]{\texttt{Req(CID)}} ([yshift=0.3cm] peer1.west);
+\draw[->, thick] ([yshift=-0.3cm] peer1.west) -- node[midway, above]{\texttt{Peer2}} ([yshift=-0.3cm] client.east |-peer1.west);
+
+\end{tikzpicture}
+\end{frame}
+
+\begin{frame}
+\frametitle{IPFS content lookup (simplified)}
+\begin{tikzpicture}[
+  thick,
+  minimum size=5mm,
+  node distance=0.7cm and 3cm,
+  >=stealth,
+  bend angle=45,
+  scale=0.9,
+  every node/.style={scale=0.9},
+  auto
+]
+\node (client)  [rounded corners, align=center, draw=graylight,
+             label=above:\textbf{Client}] {
+             	\begin{minipage}[t][6.4cm]{5.8cm}
+				Request CID \texttt{bafybeif6u5pukl3sze}\\
+				\texttt{Hash(CID)=0010101000101111}\\
+				Closest peer to \texttt{Hash(CID)}: \texttt{Peer0}\\
+				\end{minipage}
+             };
+             
+\node (peer0)  [rounded corners, text width=5.7cm, align=center, draw=graylight, right=of client.north east, anchor=north west,
+             label=above:\textbf{Peer0}] {
+			\texttt{Hash(CID)=0010101000101111}\\
+			Closest peer to \texttt{Hash(CID)}: \texttt{Peer1}
+             };
+             
+             
+
+\node (peer1)  [rounded corners, text width=5.7cm, minimum height=1cm, align=center, draw=graylight, below = of peer0,
+             label=above:\textbf{Peer1}] {
+			\texttt{Hash(CID)=0010101000101111}\\
+			Closest peer to \texttt{Hash(CID)}: \texttt{Peer2}
+             };
+
+\node (peer2)  [rounded corners, text width=5.7cm, minimum height=1cm, align=center, draw=graylight, below = of peer1,
+             label=above:\textbf{Peer2}] {
+			I have this \texttt{Provider Record!}\hspace{0.2em}\includegraphics[scale=0.02]{logos/file.png}	
+             };
+                          
+
+\draw[->, thick] ([yshift=0.3cm] client.east |- peer0.west) -- node[midway, above]{\texttt{Req(CID)}} ([yshift=0.3cm] peer0.west);
+\draw[->, thick] ([yshift=-0.3cm] peer0.west) -- node[midway, above]{\texttt{Peer1}} ([yshift=-0.3cm] client.east |-peer0.west);
+
+\draw[->, thick] ([yshift=0.3cm] client.east |- peer1.west) -- node[midway, above]{\texttt{Req(CID)}} ([yshift=0.3cm] peer1.west);
+\draw[->, thick] ([yshift=-0.3cm] peer1.west) -- node[midway, above]{\texttt{Peer2}} ([yshift=-0.3cm] client.east |-peer1.west);
+
+\draw[->, thick] ([yshift=0.3cm] client.east |- peer2.west) -- node[midway, above]{\texttt{Req(CID)}} ([yshift=0.3cm] peer2.west);
+\draw[->, thick] ([yshift=-0.3cm] peer2.west) -- node[midway, above]{
+	\includegraphics[scale=0.02]{logos/file.png}	
+	} ([yshift=-0.3cm] client.east |-peer2.west);
+	
+\end{tikzpicture}
+\end{frame}
+
+\begin{frame}
+\frametitle{IPFS content lookup (simplified)}
+\begin{tikzpicture}[
+  thick,
+  minimum size=5mm,
+  node distance=0.7cm and 3cm,
+  >=stealth,
+  bend angle=45,
+  scale=0.9,
+  every node/.style={scale=0.9},
+  auto
+]
+\node (client)  [rounded corners, align=center, draw=graylight,
+             label=above:\textbf{Client}] {
+             	\begin{minipage}[t][6.4cm]{5.8cm}
+				Request CID \texttt{bafybeif6u5pukl3sze}\\
+				\texttt{Hash(CID)=0010101000101111}\\
+				Closest peer to \texttt{Hash(CID)}: \texttt{Peer0}\\
+				\end{minipage}
+             };
+             
+\node (peer0)  [rounded corners, text width=5.7cm, align=center, draw=graylight, right=of client.north east, anchor=north west,
+             label=above:\textbf{Peer0}] {
+			\texttt{Hash(CID)=0010101000101111}\\
+			Closest peer to \texttt{Hash(CID)}: \texttt{Peer1}
+             };
+             
+             
+
+\node (peer1)  [rounded corners, text width=5.7cm, minimum height=1cm, align=center, draw=graylight, below = of peer0,
+             label=above:\textbf{Peer1}] {
+			\texttt{Hash(CID)=0010101000101111}\\
+			Closest peer to \texttt{Hash(CID)}: \texttt{Peer2}
+             };
+
+\node (peer2)  [rounded corners, text width=5.7cm, minimum height=1cm, align=center, draw=graylight, below = of peer1,
+             label=above:\textbf{Peer2}] {
+			I have this \texttt{Provider Record!}\hspace{0.2em}\includegraphics[scale=0.02]{logos/file.png}	
+             };
+             
+\node (pr)  [text width=5.7cm, minimum height=1cm, align=center, left = of peer2.south west, anchor=east] {
+             \begin{minipage}[t][2cm]{5.8cm}
+             \includegraphics[scale=0.02]{logos/file.png}\hspace{0.2em}: CID $\rightarrow$ \texttt{12D3KooWEZXjE41uU4E}\\
+             DHT lookup for \texttt{PeerID}
+			\end{minipage}
+             };
+             
+
+\draw[->, thick] ([yshift=0.3cm] client.east |- peer0.west) -- node[midway, above]{\texttt{Req(CID)}} ([yshift=0.3cm] peer0.west);
+\draw[->, thick] ([yshift=-0.3cm] peer0.west) -- node[midway, above]{\texttt{Peer1}} ([yshift=-0.3cm] client.east |-peer0.west);
+
+\draw[->, thick] ([yshift=0.3cm] client.east |- peer1.west) -- node[midway, above]{\texttt{Req(CID)}} ([yshift=0.3cm] peer1.west);
+\draw[->, thick] ([yshift=-0.3cm] peer1.west) -- node[midway, above]{\texttt{Peer2}} ([yshift=-0.3cm] client.east |-peer1.west);
+
+\draw[->, thick] ([yshift=0.3cm] client.east |- peer2.west) -- node[midway, above]{\texttt{Req(CID)}} ([yshift=0.3cm] peer2.west);
+\draw[->, thick] ([yshift=-0.3cm] peer2.west) -- node[midway, above]{
+	\includegraphics[scale=0.02]{logos/file.png}	
+	} ([yshift=-0.3cm] client.east |-peer2.west);
+	
+\end{tikzpicture}
+\end{frame}
+
+
+\begin{frame}
+\frametitle{IPFS content lookup (simplified)}
+\begin{tikzpicture}[
+  thick,
+  minimum size=5mm,
+  node distance=0.7cm and 3cm,
+  >=stealth,
+  bend angle=45,
+  scale=0.9,
+  every node/.style={scale=0.9},
+  auto
+]
+\node (client)  [rounded corners, align=center, draw=graylight,
+             label=above:\textbf{Client}] {
+             	\begin{minipage}[t][6.4cm]{5.8cm}
+				Request CID \texttt{bafybeif6u5pukl3sze}\\
+				\texttt{Hash(CID)=0010101000101111}\\
+				Closest peer to \texttt{Hash(CID)}: \texttt{Peer0}\\
+				\end{minipage}
+             };
+             
+\node (peer0)  [rounded corners, text width=5.7cm, align=center, draw=graylight, right=of client.north east, anchor=north west,
+             label=above:\textbf{Peer0}] {
+			\texttt{Hash(CID)=0010101000101111}\\
+			Closest peer to \texttt{Hash(CID)}: \texttt{Peer1}
+             };
+             
+             
+
+\node (peer1)  [rounded corners, text width=5.7cm, minimum height=1cm, align=center, draw=graylight, below = of peer0,
+             label=above:\textbf{Peer1}] {
+			\texttt{Hash(CID)=0010101000101111}\\
+			Closest peer to \texttt{Hash(CID)}: \texttt{Peer2}
+             };
+
+\node (peer2)  [rounded corners, text width=5.7cm, minimum height=1cm, align=center, draw=graylight, below = of peer1,
+             label=above:\textbf{Peer2}] {
+			I have this \texttt{Provider Record!}\hspace{0.2em}\includegraphics[scale=0.02]{logos/file.png}	
+             };
+             
+\node (pr)  [text width=5.7cm, minimum height=1cm, align=center, left = of peer2.south west, anchor=east] {
+             \begin{minipage}[t][2cm]{5.8cm}
+             \includegraphics[scale=0.02]{logos/file.png}\hspace{0.2em}: CID $\rightarrow$ \texttt{12D3KooWEZXjE41uU4E}\\
+             DHT lookup for \texttt{PeerID}
+			\end{minipage}
+             };
+
+             
+\node (peer3)  [rounded corners, text width=5.7cm, minimum height=1cm, align=center, draw=graylight, below = of peer2,
+             label=above:\textbf{Content Provider}] {
+			There you go! \hspace{0.2em}\includegraphics[scale=0.02]{logos/image.png}	
+             };
+
+             
+
+\draw[->, thick] ([yshift=0.3cm] client.east |- peer0.west) -- node[midway, above]{\texttt{Req(CID)}} ([yshift=0.3cm] peer0.west);
+\draw[->, thick] ([yshift=-0.3cm] peer0.west) -- node[midway, above]{\texttt{Peer1}} ([yshift=-0.3cm] client.east |-peer0.west);
+
+\draw[->, thick] ([yshift=0.3cm] client.east |- peer1.west) -- node[midway, above]{\texttt{Req(CID)}} ([yshift=0.3cm] peer1.west);
+\draw[->, thick] ([yshift=-0.3cm] peer1.west) -- node[midway, above]{\texttt{Peer2}} ([yshift=-0.3cm] client.east |-peer1.west);
+
+\draw[->, thick] ([yshift=0.3cm] client.east |- peer2.west) -- node[midway, above]{\texttt{Req(CID)}} ([yshift=0.3cm] peer2.west);
+\draw[->, thick] ([yshift=-0.3cm] peer2.west) -- node[midway, above]{
+	\includegraphics[scale=0.02]{logos/file.png}	
+	} ([yshift=-0.3cm] client.east |-peer2.west);
+	
+\draw[->, thick] ([yshift=0.3cm] client.east |- peer3.west) -- node[midway, above]{\texttt{Req(CID)}} ([yshift=0.3cm] peer3.west);
+\draw[->, thick] ([yshift=-0.3cm] peer3.west) -- node[midway, above]{
+	\includegraphics[scale=0.02]{logos/image.png}	
+	} ([yshift=-0.3cm] client.east |-peer3.west);
+
+\end{tikzpicture}
+\end{frame}
+
+\begin{frame}
+\frametitle{Who can see my requests?}
+\begin{tikzpicture}[
+  thick,
+  minimum size=5mm,
+  node distance=0.7cm and 3cm,
+  >=stealth,
+  bend angle=45,
+  scale=0.9,
+  every node/.style={scale=0.9},
+  auto
+]
+\node (client)  [rounded corners, align=center, draw=graylight,
+             label=above:\textbf{Client}] {
+             	\begin{minipage}[t][6.4cm]{5.8cm}
+				Request CID \texttt{bafybeif6u5pukl3sze}\\
+				\texttt{Hash(CID)=0010101000101111}\\
+				Closest peer to \texttt{Hash(CID)}: \texttt{Peer0}\\
+				\end{minipage}
+             };
+             
+\node (peer0)  [rounded corners, text width=5.7cm, align=center, draw=graylight, right=of client.north east, anchor=north west,
+             label=above:\textbf{Peer0}] {
+			\texttt{Hash(CID)=0010101000101111}\\
+			Closest peer to \texttt{Hash(CID)}: \texttt{Peer1}
+             };
+             
+\node (peer1)  [rounded corners, text width=5.7cm, minimum height=1cm, align=center, draw=graylight, below = of peer0,
+             label=above:\textbf{Peer1}] {
+			\texttt{Hash(CID)=0010101000101111}\\
+			Closest peer to \texttt{Hash(CID)}: \texttt{Peer2}
+             };
+
+
+\node (peer2)  [rounded corners, text width=5.7cm, minimum height=1cm, align=center, draw=graylight, below = of peer1,
+             label=above:\textbf{Peer2}] {
+			I have this \texttt{Provider Record!}\hspace{0.2em}\includegraphics[scale=0.02]{logos/file.png}	
+             };
+                          
+\node (pr)  [text width=5.7cm, minimum height=1cm, align=center, left = of peer2.south west, anchor=east] {
+             \begin{minipage}[t][2cm]{5.8cm}
+             \includegraphics[scale=0.02]{logos/file.png}\hspace{0.2em}: CID $\rightarrow$ \texttt{12D3KooWEZXjE41uU4E}\\
+             DHT lookup for \texttt{PeerID}
+			\end{minipage}
+             };
+             
+             
+\node (peer3)  [rounded corners, text width=5.7cm, minimum height=1cm, align=center, draw=graylight, below = of peer2,
+             label=above:\textbf{Content Provider}] {
+			There you go! \hspace{0.2em}\includegraphics[scale=0.02]{logos/image.png}	
+             };
+
+\node (eye3) [above=of peer3.north east, xshift=-0.5cm, yshift=-0.8cm] {\includegraphics[scale=0.06]{logos/red_eyes.png}};             
+
+\draw[->, thick] ([yshift=0.3cm] client.east |- peer0.west) -- node[midway, above]{
+	\texttt{Req(CID)}} ([yshift=0.3cm] peer0.west);
+\draw[->, thick] ([yshift=-0.3cm] peer0.west) -- node[midway, above]{\texttt{Peer1}} ([yshift=-0.3cm] client.east |-peer0.west);
+
+\draw[->, thick] ([yshift=0.3cm] client.east |- peer1.west) -- node[midway, above]{
+	\texttt{Req(CID)}} ([yshift=0.3cm] peer1.west);
+\draw[->, thick] ([yshift=-0.3cm] peer1.west) -- node[midway, above]{\texttt{Peer2}} ([yshift=-0.3cm] client.east |-peer1.west);
+
+\draw[->, thick] ([yshift=0.3cm] client.east |- peer2.west) -- node[midway, above]{
+	\texttt{Req(CID)}} ([yshift=0.3cm] peer2.west);
+\draw[->, thick] ([yshift=-0.3cm] peer2.west) -- node[midway, above]{
+	\includegraphics[scale=0.02]{logos/file.png}	
+	} ([yshift=-0.3cm] client.east |-peer2.west);
+	
+\draw[->, thick] ([yshift=0.3cm] client.east |- peer3.west) -- node[midway, above]{\texttt{Req(CID)}} ([yshift=0.3cm] peer3.west);
+\draw[->, thick] ([yshift=-0.3cm] peer3.west) -- node[midway, above]{
+	\includegraphics[scale=0.02]{logos/image.png}	
+	} ([yshift=-0.3cm] client.east |-peer3.west);
+
+\end{tikzpicture}
+\end{frame}
+
+\begin{frame}
+\frametitle{Who can see my requests?}
+\begin{tikzpicture}[
+  thick,
+  minimum size=5mm,
+  node distance=0.7cm and 3cm,
+  >=stealth,
+  bend angle=45,
+  scale=0.9,
+  every node/.style={scale=0.9},
+  auto
+]
+\node (client)  [rounded corners, align=center, draw=graylight,
+             label=above:\textbf{Client}] {
+             	\begin{minipage}[t][6.4cm]{5.8cm}
+				Request CID \texttt{bafybeif6u5pukl3sze}\\
+				\texttt{Hash(CID)=0010101000101111}\\
+				Closest peer to \texttt{Hash(CID)}: \texttt{Peer0}\\
+				\end{minipage}
+             };
+             
+\node (peer0)  [rounded corners, text width=5.7cm, align=center, draw=graylight, right=of client.north east, anchor=north west,
+             label=above:\textbf{Peer0}] {
+			\texttt{Hash(CID)=0010101000101111}\\
+			Closest peer to \texttt{Hash(CID)}: \texttt{Peer1}
+             };
+             
+\node (peer1)  [rounded corners, text width=5.7cm, minimum height=1cm, align=center, draw=graylight, below = of peer0,
+             label=above:\textbf{Peer1}] {
+			\texttt{Hash(CID)=0010101000101111}\\
+			Closest peer to \texttt{Hash(CID)}: \texttt{Peer2}
+             };
+
+
+\node (peer2)  [rounded corners, text width=5.7cm, minimum height=1cm, align=center, draw=graylight, below = of peer1,
+             label=above:\textbf{Peer2}] {
+			I have this \texttt{Provider Record!}\hspace{0.2em}\includegraphics[scale=0.02]{logos/file.png}	
+             };
+
+\node (eye2) [above=of peer2.north east, xshift=-0.5cm, yshift=-0.8cm] {\includegraphics[scale=0.06]{logos/red_eyes.png}};
+                          
+\node (pr)  [text width=5.7cm, minimum height=1cm, align=center, left = of peer2.south west, anchor=east] {
+             \begin{minipage}[t][2cm]{5.8cm}
+             \includegraphics[scale=0.02]{logos/file.png}\hspace{0.2em}: CID $\rightarrow$ \texttt{12D3KooWEZXjE41uU4E}\\
+             DHT lookup for \texttt{PeerID}
+			\end{minipage}
+             };
+             
+             
+\node (peer3)  [rounded corners, text width=5.7cm, minimum height=1cm, align=center, draw=graylight, below = of peer2,
+             label=above:\textbf{Content Provider}] {
+			There you go! \hspace{0.2em}\includegraphics[scale=0.02]{logos/image.png}	
+             };
+
+\node (eye3) [above=of peer3.north east, xshift=-0.5cm, yshift=-0.8cm] {\includegraphics[scale=0.06]{logos/eyes.png}};
+             
+
+\draw[->, thick] ([yshift=0.3cm] client.east |- peer0.west) -- node[midway, above]{
+	\texttt{Req(CID)}} ([yshift=0.3cm] peer0.west);
+\draw[->, thick] ([yshift=-0.3cm] peer0.west) -- node[midway, above]{\texttt{Peer1}} ([yshift=-0.3cm] client.east |-peer0.west);
+
+\draw[->, thick] ([yshift=0.3cm] client.east |- peer1.west) -- node[midway, above]{
+	\texttt{Req(CID)}} ([yshift=0.3cm] peer1.west);
+\draw[->, thick] ([yshift=-0.3cm] peer1.west) -- node[midway, above]{\texttt{Peer2}} ([yshift=-0.3cm] client.east |-peer1.west);
+
+\draw[->, thick] ([yshift=0.3cm] client.east |- peer2.west) -- node[midway, above]{
+	\texttt{Req(CID)}} ([yshift=0.3cm] peer2.west);
+\draw[->, thick] ([yshift=-0.3cm] peer2.west) -- node[midway, above]{
+	\includegraphics[scale=0.02]{logos/file.png}	
+	} ([yshift=-0.3cm] client.east |-peer2.west);
+	
+\draw[->, thick] ([yshift=0.3cm] client.east |- peer3.west) -- node[midway, above]{\texttt{Req(CID)}} ([yshift=0.3cm] peer3.west);
+\draw[->, thick] ([yshift=-0.3cm] peer3.west) -- node[midway, above]{
+	\includegraphics[scale=0.02]{logos/image.png}	
+	} ([yshift=-0.3cm] client.east |-peer3.west);
+
+\end{tikzpicture}
+\end{frame}
+
+\begin{frame}
+\frametitle{Who can see my requests?}
+\begin{tikzpicture}[
+  thick,
+  minimum size=5mm,
+  node distance=0.7cm and 3cm,
+  >=stealth,
+  bend angle=45,
+  scale=0.9,
+  every node/.style={scale=0.9},
+  auto
+]
+\node (client)  [rounded corners, align=center, draw=graylight,
+             label=above:\textbf{Client}] {
+             	\begin{minipage}[t][6.4cm]{5.8cm}
+				Request CID \texttt{bafybeif6u5pukl3sze}\\
+				\texttt{Hash(CID)=0010101000101111}\\
+				Closest peer to \texttt{Hash(CID)}: \texttt{Peer0}\\
+				\end{minipage}
+             };
+             
+\node (peer0)  [rounded corners, text width=5.7cm, align=center, draw=graylight, right=of client.north east, anchor=north west,
+             label=above:\textbf{Peer0}] {
+			\texttt{Hash(CID)=0010101000101111}\\
+			Closest peer to \texttt{Hash(CID)}: \texttt{Peer1}
+             };
+             
+\node (eye0) [above=of peer0.north east, xshift=-0.5cm, yshift=-0.8cm] {\includegraphics[scale=0.06]{logos/red_eyes.png}};
+
+\node (peer1)  [rounded corners, text width=5.7cm, minimum height=1cm, align=center, draw=graylight, below = of peer0,
+             label=above:\textbf{Peer1}] {
+			\texttt{Hash(CID)=0010101000101111}\\
+			Closest peer to \texttt{Hash(CID)}: \texttt{Peer2}
+             };
+
+\node (eye1) [above=of peer1.north east, xshift=-0.5cm, yshift=-0.8cm] {\includegraphics[scale=0.06]{logos/red_eyes.png}};
+
+
+\node (peer2)  [rounded corners, text width=5.7cm, minimum height=1cm, align=center, draw=graylight, below = of peer1,
+             label=above:\textbf{Peer2}] {
+			I have this \texttt{Provider Record!}\hspace{0.2em}\includegraphics[scale=0.02]{logos/file.png}	
+             };
+
+\node (eye2) [above=of peer2.north east, xshift=-0.5cm, yshift=-0.8cm] {\includegraphics[scale=0.06]{logos/eyes.png}};
+                          
+\node (pr)  [text width=5.7cm, minimum height=1cm, align=center, left = of peer2.south west, anchor=east] {
+             \begin{minipage}[t][2cm]{5.8cm}
+             \includegraphics[scale=0.02]{logos/file.png}\hspace{0.2em}: CID $\rightarrow$ \texttt{12D3KooWEZXjE41uU4E}\\
+             DHT lookup for \texttt{PeerID}
+			\end{minipage}
+             };
+             
+             
+\node (peer3)  [rounded corners, text width=5.7cm, minimum height=1cm, align=center, draw=graylight, below = of peer2,
+             label=above:\textbf{Content Provider}] {
+			There you go! \hspace{0.2em}\includegraphics[scale=0.02]{logos/image.png}	
+             };
+
+\node (eye3) [above=of peer3.north east, xshift=-0.5cm, yshift=-0.8cm] {\includegraphics[scale=0.06]{logos/eyes.png}};
+             
+
+\draw[->, thick] ([yshift=0.3cm] client.east |- peer0.west) -- node[midway, above]{
+	\texttt{Req(CID)}} ([yshift=0.3cm] peer0.west);
+\draw[->, thick] ([yshift=-0.3cm] peer0.west) -- node[midway, above]{\texttt{Peer1}} ([yshift=-0.3cm] client.east |-peer0.west);
+
+\draw[->, thick] ([yshift=0.3cm] client.east |- peer1.west) -- node[midway, above]{
+	\texttt{Req(CID)}} ([yshift=0.3cm] peer1.west);
+\draw[->, thick] ([yshift=-0.3cm] peer1.west) -- node[midway, above]{\texttt{Peer2}} ([yshift=-0.3cm] client.east |-peer1.west);
+
+\draw[->, thick] ([yshift=0.3cm] client.east |- peer2.west) -- node[midway, above]{
+	\texttt{Req(CID)}} ([yshift=0.3cm] peer2.west);
+\draw[->, thick] ([yshift=-0.3cm] peer2.west) -- node[midway, above]{
+	\includegraphics[scale=0.02]{logos/file.png}	
+	} ([yshift=-0.3cm] client.east |-peer2.west);
+	
+\draw[->, thick] ([yshift=0.3cm] client.east |- peer3.west) -- node[midway, above]{\texttt{Req(CID)}} ([yshift=0.3cm] peer3.west);
+\draw[->, thick] ([yshift=-0.3cm] peer3.west) -- node[midway, above]{
+	\includegraphics[scale=0.02]{logos/image.png}	
+	} ([yshift=-0.3cm] client.east |-peer3.west);
+
+\end{tikzpicture}
+\end{frame}
+
+\begin{frame}
+\frametitle{Who can see my requests?}
+\begin{tikzpicture}[
+  thick,
+  minimum size=5mm,
+  node distance=0.7cm and 3cm,
+  >=stealth,
+  bend angle=45,
+  scale=0.9,
+  every node/.style={scale=0.9},
+  auto
+]
+\node (client)  [rounded corners, align=center, draw=graylight,
+             label=above:\textbf{Client}] {
+             	\begin{minipage}[t][6.4cm]{5.8cm}
+				Request CID \texttt{bafybeif6u5pukl3sze}\\
+				\texttt{Hash(CID)=0010101000101111}\\
+				Closest peer to \texttt{Hash(CID)}: \texttt{Peer0}\\
+				\end{minipage}
+             };
+             
+\node (peer0)  [rounded corners, text width=5.7cm, align=center, draw=graylight, right=of client.north east, anchor=north west,
+             label=above:\textbf{Peer0}] {
+			\texttt{Hash(CID)=0010101000101111}\\
+			Closest peer to \texttt{Hash(CID)}: \texttt{Peer1}
+             };
+             
+\node (eye0) [above=of peer0.north east, xshift=-0.5cm, yshift=-0.8cm] {\includegraphics[scale=0.06]{logos/eyes.png}};
+
+\node (peer1)  [rounded corners, text width=5.7cm, minimum height=1cm, align=center, draw=graylight, below = of peer0,
+             label=above:\textbf{Peer1}] {
+			\texttt{Hash(CID)=0010101000101111}\\
+			Closest peer to \texttt{Hash(CID)}: \texttt{Peer2}
+             };
+
+\node (eye1) [above=of peer1.north east, xshift=-0.5cm, yshift=-0.8cm] {\includegraphics[scale=0.06]{logos/eyes.png}};
+
+
+\node (peer2)  [rounded corners, text width=5.7cm, minimum height=1cm, align=center, draw=graylight, below = of peer1,
+             label=above:\textbf{Peer2}] {
+			I have this \texttt{Provider Record!}\hspace{0.2em}\includegraphics[scale=0.02]{logos/file.png}	
+             };
+
+\node (eye2) [above=of peer2.north east, xshift=-0.5cm, yshift=-0.8cm] {\includegraphics[scale=0.06]{logos/eyes.png}};
+                          
+\node (pr)  [text width=5.7cm, minimum height=1cm, align=center, left = of peer2.south west, anchor=east] {
+             \begin{minipage}[t][2cm]{5.8cm}
+             \includegraphics[scale=0.02]{logos/file.png}\hspace{0.2em}: CID $\rightarrow$ \texttt{12D3KooWEZXjE41uU4E}\\
+             DHT lookup for \texttt{PeerID}
+			\end{minipage}
+             };
+             
+             
+\node (peer3)  [rounded corners, text width=5.7cm, minimum height=1cm, align=center, draw=graylight, below = of peer2,
+             label=above:\textbf{Content Provider}] {
+			There you go! \hspace{0.2em}\includegraphics[scale=0.02]{logos/image.png}	
+             };
+
+\node (eye3) [above=of peer3.north east, xshift=-0.5cm, yshift=-0.8cm] {\includegraphics[scale=0.06]{logos/eyes.png}};
+             
+
+\draw[->, thick] ([yshift=0.3cm] client.east |- peer0.west) -- node[midway, above]{
+	\texttt{Req(CID)} \includegraphics[scale=0.06]{logos/red_eyes.png}} ([yshift=0.3cm] peer0.west);
+\draw[->, thick] ([yshift=-0.3cm] peer0.west) -- node[midway, above]{\texttt{Peer1}} ([yshift=-0.3cm] client.east |-peer0.west);
+
+\draw[->, thick] ([yshift=0.3cm] client.east |- peer1.west) -- node[midway, above]{
+	\texttt{Req(CID)} \includegraphics[scale=0.06]{logos/red_eyes.png}} ([yshift=0.3cm] peer1.west);
+\draw[->, thick] ([yshift=-0.3cm] peer1.west) -- node[midway, above]{\texttt{Peer2}} ([yshift=-0.3cm] client.east |-peer1.west);
+
+\draw[->, thick] ([yshift=0.3cm] client.east |- peer2.west) -- node[midway, above]{
+	\texttt{Req(CID)} \includegraphics[scale=0.06]{logos/red_eyes.png}} ([yshift=0.3cm] peer2.west);
+\draw[->, thick] ([yshift=-0.3cm] peer2.west) -- node[midway, above]{
+	\includegraphics[scale=0.02]{logos/file.png}	
+	} ([yshift=-0.3cm] client.east |-peer2.west);
+	
+\draw[->, thick] ([yshift=0.3cm] client.east |- peer3.west) -- node[midway, above]{\texttt{Req(CID)}} ([yshift=0.3cm] peer3.west);
+\draw[->, thick] ([yshift=-0.3cm] peer3.west) -- node[midway, above]{
+	\includegraphics[scale=0.02]{logos/image.png}	
+	} ([yshift=-0.3cm] client.east |-peer3.west);
+
+\end{tikzpicture}
+\end{frame}
+
+\iffalse
+\begin{frame}
+\frametitle{Who can see my requests?}
+\begin{tikzpicture}[
+  thick,
+  minimum size=5mm,
+  node distance=0.7cm and 3cm,
+  >=stealth,
+  bend angle=45,
+  scale=0.9,
+  every node/.style={scale=0.9},
+  auto
+]
+\node (client)  [rounded corners, align=center, draw=graylight,
+             label=above:\textbf{Client}] {
+             	\begin{minipage}[t][6.4cm]{5.8cm}
+				Request CID \texttt{bafybeif6u5pukl3sze}\\
+				\texttt{Hash(CID)=0010101000101111}\\
+				Closest peer to \texttt{Hash(CID)}: \texttt{Peer0}\\
+				\end{minipage}
+             };
+             
+\node (peer0)  [rounded corners, text width=5.7cm, align=center, draw=graylight, right=of client.north east, anchor=north west,
+             label=above:\textbf{Peer0}] {
+			\texttt{Hash(CID)=0010101000101111}\\
+			Closest peer to \texttt{Hash(CID)}: \texttt{Peer1}
+             };
+             
+\node (eye0) [above=of peer0.north east, xshift=-0.5cm, yshift=-0.8cm] {\includegraphics[scale=0.06]{logos/eyes.png}};
+
+\node (peer1)  [rounded corners, text width=5.7cm, minimum height=1cm, align=center, draw=graylight, below = of peer0,
+             label=above:\textbf{Peer1}] {
+			\texttt{Hash(CID)=0010101000101111}\\
+			Closest peer to \texttt{Hash(CID)}: \texttt{Peer2}
+             };
+
+\node (eye1) [above=of peer1.north east, xshift=-0.5cm, yshift=-0.8cm] {\includegraphics[scale=0.06]{logos/eyes.png}};
+
+
+\node (peer2)  [rounded corners, text width=5.7cm, minimum height=1cm, align=center, draw=graylight, below = of peer1,
+             label=above:\textbf{Peer2}] {
+			I have this \texttt{Provider Record!}\hspace{0.2em}\includegraphics[scale=0.02]{logos/file.png}	
+             };
+
+\node (eye2) [above=of peer2.north east, xshift=-0.5cm, yshift=-0.8cm] {\includegraphics[scale=0.06]{logos/eyes.png}};
+                          
+\node (pr)  [text width=5.7cm, minimum height=1cm, align=center, left = of peer2.south west, anchor=east] {
+             \begin{minipage}[t][2cm]{5.8cm}
+             \includegraphics[scale=0.02]{logos/file.png}\hspace{0.2em}: CID $\rightarrow$ \texttt{12D3KooWEZXjE41uU4E}\\
+             DHT lookup for \texttt{PeerID}
+			\end{minipage}
+             };
+             
+             
+\node (peer3)  [rounded corners, text width=5.7cm, minimum height=1cm, align=center, draw=graylight, below = of peer2,
+             label=above:\textbf{Content Provider}] {
+			There you go! \hspace{0.2em}\includegraphics[scale=0.02]{logos/image.png}	
+             };
+
+\node (eye3) [above=of peer3.north east, xshift=-0.5cm, yshift=-0.8cm] {\includegraphics[scale=0.06]{logos/eyes.png}};
+             
+
+\draw[->, thick] ([yshift=0.3cm] client.east |- peer0.west) -- node[midway, above]{
+	\texttt{Req(CID)} \includegraphics[scale=0.06]{logos/eyes.png}} ([yshift=0.3cm] peer0.west);
+\draw[->, thick] ([yshift=-0.3cm] peer0.west) -- node[midway, above]{\texttt{Peer1}} ([yshift=-0.3cm] client.east |-peer0.west);
+
+\draw[->, thick] ([yshift=0.3cm] client.east |- peer1.west) -- node[midway, above]{
+	\texttt{Req(CID)} \includegraphics[scale=0.06]{logos/eyes.png}} ([yshift=0.3cm] peer1.west);
+\draw[->, thick] ([yshift=-0.3cm] peer1.west) -- node[midway, above]{\texttt{Peer2}} ([yshift=-0.3cm] client.east |-peer1.west);
+
+\draw[->, thick] ([yshift=0.3cm] client.east |- peer2.west) -- node[midway, above]{
+	\texttt{Req(CID)} \includegraphics[scale=0.06]{logos/eyes.png}} ([yshift=0.3cm] peer2.west);
+\draw[->, thick] ([yshift=-0.3cm] peer2.west) -- node[midway, above]{
+	\includegraphics[scale=0.02]{logos/file.png}	
+	} ([yshift=-0.3cm] client.east |-peer2.west);
+	
+\draw[->, thick] ([yshift=0.3cm] client.east |- peer3.west) -- node[midway, above]{\texttt{Req(CID)}} ([yshift=0.3cm] peer3.west);
+\draw[->, thick] ([yshift=-0.3cm] peer3.west) -- node[midway, above]{
+	\includegraphics[scale=0.02]{logos/image.png}	
+	} ([yshift=-0.3cm] client.east |-peer3.west);
+
+\end{tikzpicture}
+\end{frame}
+\fi
+
+\begin{frame}
+\frametitle{Problem definition}
+
+We want to improve \textit{Client Privacy} in the DHT. We want to hide Content Requests from the DHT nodes and passive observers.
+
+\vspace{2em}
+
+We do not address:
+\begin{itemize}
+	\item Content Provider Privacy
+	\item Bitswap Privacy
+	\item Client Privacy from the Content Provider
+	\item Client Privacy from the Gateways
+\end{itemize}
+\end{frame}
+
+\begin{frame}
+\frametitle{Prefix lookup}
+We want to request a prefix of the content to hide the exact CID. But:
+\begin{itemize}
+	\item \texttt{Hash(bafybeif6u5pukl3sze)} $\neq$ \texttt{Hash(bafybeif6u5puk)}
+	\item Request cannot be routed in the DHT $\rightarrow$ the content cannot be accessed
+	\item We want to request a prefix of \texttt{Hash(bafybeif6u5pukl3sze)}
+	\item DHT Routing process has to be adapted
+\end{itemize}
+
+\end{frame}
+
+\iffalse
+\begin{frame}
+\frametitle{Kademlia keyspace}
+\begin{tikzpicture}[
+	thick,
+	scale=0.8,
+  	every node/.style={scale=0.8},
+    level 1/.style = {sibling distance=8.8cm},
+    level 2/.style = {sibling distance=4.4cm},
+    level 3/.style = {sibling distance=2.2cm},
+    level 4/.style = {sibling distance=1.1cm},
+    level distance = 1.5cm
+]
+ 	\node[trienode] {root}
+	child {
+		node[trienode] {0}
+		child {
+			node[trienode] {00}
+			child {
+				node[trienode] {000}
+				child {
+					node[trienode] {0000}
+				}
+				child {
+					node[trienode] {0001}
+				}
+			}
+			child {
+				node[trienode] {001}
+				child {
+					node[trienode] {0010}
+				}
+				child {
+					node[trienode] {0011}
+				}
+			}
+		}
+		child {
+			node[trienode] {01}
+			child {
+				node[trienode] {010}
+				child {
+					node[trienode] {0100}
+				}
+				child {
+					node[trienode] {0101}
+				}
+			}
+			child {
+				node[trienode] {011}
+				child {
+					node[trienode] {0110}
+				}
+				child {
+					node[trienode] {0111}
+				}
+			}
+		}
+	}
+	child {
+		node[trienode] {1}
+		child {
+			node[trienode] {10}
+			child {
+				node[trienode] {100}
+				child {
+					node[trienode] {1000}
+				}
+				child {
+					node[trienode] {1001}
+				}
+			}
+			child {
+				node[trienode] {101}
+				child {
+					node[trienode] {1010}
+				}
+				child {
+					node[trienode] {1011}
+				}
+			}
+		}
+		child {
+			node[trienode] {11}
+			child {
+				node[trienode] {110}
+				child {
+					node[trienode] {1100}
+				}
+				child {
+					node[trienode] {1101}
+				}
+			}
+			child {
+				node[trienode] {111}
+				child {
+					node[trienode] {1110}
+				}
+				child {
+					node[trienode] {1111}
+				}
+			}
+		}
+	}
+  ;
+\end{tikzpicture}
+\end{frame}
+\fi
+
+\begin{frame}
+\frametitle{First change: Request \texttt{Hash(CID)}}
+\begin{tikzpicture}[
+  thick,
+  minimum size=5mm,
+  node distance=0.7cm and 3cm,
+  >=stealth,
+  bend angle=45,
+  scale=0.9,
+  every node/.style={scale=0.9},
+  auto
+]
+\node (client)  [rounded corners, align=center, draw=graylight,
+             label=above:\textbf{Client}] {
+             	\begin{minipage}[t][6.4cm]{5.8cm}
+				Request CID \texttt{bafybeif6u5pukl3sze}\\
+				\texttt{Hash(CID)=0010101000101111}\\
+				Closest peer to \texttt{Hash(CID)}: \texttt{Peer0}\\
+				\end{minipage}
+             };
+             
+\node (peer0)  [rounded corners, text width=5.7cm, align=center, draw=graylight, right=of client.north east, anchor=north west,
+             label=above:\textbf{Peer0}] {
+			{\color{coolred}\sout{\texttt{Hash(CID)=0010101000101111}}}\\
+			Closest peer to \texttt{Hash(CID)}: \texttt{Peer1}
+             };
+             
+\node (eye0) [above=of peer0.north east, xshift=-0.5cm, yshift=-0.8cm] {\includegraphics[scale=0.06]{logos/eyes.png}};
+
+\node (peer1)  [rounded corners, text width=5.7cm, minimum height=1cm, align=center, draw=graylight, below = of peer0,
+             label=above:\textbf{Peer1}] {
+			{\color{coolred}\sout{\texttt{Hash(CID)=0010101000101111}}}\\
+			Closest peer to \texttt{Hash(CID)}: \texttt{Peer2}
+             };
+
+\node (eye1) [above=of peer1.north east, xshift=-0.5cm, yshift=-0.8cm] {\includegraphics[scale=0.06]{logos/eyes.png}};
+
+
+\node (peer2)  [rounded corners, text width=5.7cm, minimum height=1cm, align=center, draw=graylight, below = of peer1,
+             label=above:\textbf{Peer2}] {
+			I have this \texttt{Provider Record!}\hspace{0.2em}\includegraphics[scale=0.02]{logos/file.png}	
+             };
+
+\node (eye2) [above=of peer2.north east, xshift=-0.5cm, yshift=-0.8cm] {\includegraphics[scale=0.06]{logos/eyes.png}};
+                          
+\node (pr)  [text width=5.7cm, minimum height=1cm, align=center, left = of peer2.south west, anchor=east] {
+             \begin{minipage}[t][2cm]{5.8cm}
+             \includegraphics[scale=0.02]{logos/file.png}\hspace{0.2em}: CID $\rightarrow$ \texttt{12D3KooWEZXjE41uU4E}\\
+             DHT lookup for \texttt{PeerID}
+			\end{minipage}
+             };
+             
+             
+\node (peer3)  [rounded corners, text width=5.7cm, minimum height=1cm, align=center, draw=graylight, below = of peer2,
+             label=above:\textbf{Content Provider}] {
+			There you go! \hspace{0.2em}\includegraphics[scale=0.02]{logos/image.png}	
+             };
+
+\node (eye3) [above=of peer3.north east, xshift=-0.5cm, yshift=-0.8cm] {\includegraphics[scale=0.06]{logos/eyes.png}};
+             
+
+\draw[->, thick] ([yshift=0.3cm] client.east |- peer0.west) -- node[midway, above]{
+	{\color{coolred}\texttt{Req(H(CID))}} \includegraphics[scale=0.06]{logos/eyes.png}} ([yshift=0.3cm] peer0.west);
+\draw[->, thick] ([yshift=-0.3cm] peer0.west) -- node[midway, above]{\texttt{Peer1}} ([yshift=-0.3cm] client.east |-peer0.west);
+
+\draw[->, thick] ([yshift=0.3cm] client.east |- peer1.west) -- node[midway, above]{
+	{\color{coolred}\texttt{Req(H(CID))}} \includegraphics[scale=0.06]{logos/eyes.png}} ([yshift=0.3cm] peer1.west);
+\draw[->, thick] ([yshift=-0.3cm] peer1.west) -- node[midway, above]{\texttt{Peer2}} ([yshift=-0.3cm] client.east |-peer1.west);
+
+\draw[->, thick] ([yshift=0.3cm] client.east |- peer2.west) -- node[midway, above]{
+	{\color{coolred}\texttt{Req(H(CID))}} \includegraphics[scale=0.06]{logos/eyes.png}} ([yshift=0.3cm] peer2.west);
+\draw[->, thick] ([yshift=-0.3cm] peer2.west) -- node[midway, above]{
+	\includegraphics[scale=0.02]{logos/file.png}	
+	} ([yshift=-0.3cm] client.east |-peer2.west);
+	
+\draw[->, thick] ([yshift=0.3cm] client.east |- peer3.west) -- node[midway, above]{\texttt{Req(CID)}} ([yshift=0.3cm] peer3.west);
+\draw[->, thick] ([yshift=-0.3cm] peer3.west) -- node[midway, above]{
+	\includegraphics[scale=0.02]{logos/image.png}	
+	} ([yshift=-0.3cm] client.east |-peer3.west);
+
+\end{tikzpicture}
+\end{frame}
+
+\begin{frame}
+\frametitle{Second change: Request a prefix of \texttt{Hash(CID)}}
+\begin{tikzpicture}[
+  thick,
+  minimum size=5mm,
+  node distance=0.7cm and 3cm,
+  >=stealth,
+  bend angle=45,
+  scale=0.9,
+  every node/.style={scale=0.9},
+  auto
+]
+\node (client)  [rounded corners, align=center, draw=graylight,
+             label=above:\textbf{Client}] {
+             	\begin{minipage}[t][6.4cm]{5.8cm}
+				Request CID \texttt{bafybeif6u5pukl3sze}\\
+				\texttt{Hash(CID) = 0010101000101111}\\
+				{\color{coolred}\texttt{prefix\hspace{1.5em} = 001010100010}}\\
+				Closest peer to {\color{coolred}\texttt{prefix}}: \texttt{Peer0}\\
+				\end{minipage}
+             };
+             
+\node (peer0)  [rounded corners, text width=5.7cm, align=center, draw=graylight, right=of client.north east, anchor=north west,
+             label=above:\textbf{Peer0}] {
+			\sout{\texttt{Hash(CID)=0010101000101111}}\\
+			Closest peer to {\color{coolred}\texttt{prefix}}: \texttt{Peer1}
+             };
+             
+\node (eye0) [above=of peer0.north east, xshift=-0.5cm, yshift=-0.8cm] {\includegraphics[scale=0.06]{logos/eyes.png}};
+
+\node (peer1)  [rounded corners, text width=5.7cm, minimum height=1cm, align=center, draw=graylight, below = of peer0,
+             label=above:\textbf{Peer1}] {
+			\sout{\texttt{Hash(CID)=0010101000101111}}\\
+			Closest peer to {\color{coolred}\texttt{prefix}}: \texttt{Peer2}
+             };
+
+\node (eye1) [above=of peer1.north east, xshift=-0.5cm, yshift=-0.8cm] {\includegraphics[scale=0.06]{logos/eyes.png}};
+
+
+\node (peer2)  [rounded corners, text width=5.7cm, minimum height=1cm, align=center, draw=graylight, below = of peer1,
+             label=above:\textbf{Peer2}] {
+			{\color{coolred}\texttt{Provider Record} prefix matches:} \\
+			\includegraphics[scale=0.02]{logos/file-red.png}
+			\includegraphics[scale=0.02]{logos/file-red.png}
+			\includegraphics[scale=0.02]{logos/file-red.png}
+			\includegraphics[scale=0.02]{logos/file-star-red.png}
+			\includegraphics[scale=0.02]{logos/file-red.png}
+             };
+
+\node (eye2) [above=of peer2.north east, xshift=-0.5cm, yshift=-0.8cm] {\includegraphics[scale=0.06]{logos/eyes.png}};
+                          
+\node (pr)  [text width=5.7cm, minimum height=1cm, align=center, left = of peer2.south west, anchor=east] {
+             \begin{minipage}[t][2cm]{5.8cm}
+             {\color{coolred}Discard}\hspace{0.5em}
+             \includegraphics[scale=0.02]{logos/file-red.png}
+             \includegraphics[scale=0.02]{logos/file-red.png}
+             \includegraphics[scale=0.02]{logos/file-red.png}
+             \includegraphics[scale=0.02]{logos/file-red.png}\\
+             \includegraphics[scale=0.02]{logos/file-star-red.png}\hspace{0.2em}: CID $\rightarrow$ \texttt{12D3KooWEZXjE41uU4E}\\
+             DHT lookup for \texttt{PeerID}
+			\end{minipage}
+             };
+             
+             
+\node (peer3)  [rounded corners, text width=5.7cm, minimum height=1cm, align=center, draw=graylight, below = of peer2,
+             label=above:\textbf{Content Provider}] {
+			There you go! \hspace{0.2em}\includegraphics[scale=0.02]{logos/image.png}	
+             };
+
+\node (eye3) [above=of peer3.north east, xshift=-0.5cm, yshift=-0.8cm] {\includegraphics[scale=0.06]{logos/eyes.png}};
+             
+
+\draw[->, thick] ([yshift=0.3cm] client.east |- peer0.west) -- node[midway, above]{
+	\texttt{Req({\color{coolred}prefix})} \includegraphics[scale=0.06]{logos/eyes.png}} ([yshift=0.3cm] peer0.west);
+\draw[->, thick] ([yshift=-0.3cm] peer0.west) -- node[midway, above]{\texttt{Peer1}} ([yshift=-0.3cm] client.east |-peer0.west);
+
+\draw[->, thick] ([yshift=0.3cm] client.east |- peer1.west) -- node[midway, above]{
+	\texttt{Req({\color{coolred}prefix})} \includegraphics[scale=0.06]{logos/eyes.png}} ([yshift=0.3cm] peer1.west);
+\draw[->, thick] ([yshift=-0.3cm] peer1.west) -- node[midway, above]{\texttt{Peer2}} ([yshift=-0.3cm] client.east |-peer1.west);
+
+\draw[->, thick] ([yshift=0.3cm] client.east |- peer2.west) -- node[midway, above]{
+	\texttt{Req({\color{coolred}prefix})} \includegraphics[scale=0.06]{logos/eyes.png}} ([yshift=0.3cm] peer2.west);
+\draw[->, thick] ([yshift=-0.3cm] peer2.west) -- node[midway, above]{
+	\includegraphics[scale=0.02]{logos/file-red.png}
+	\includegraphics[scale=0.02]{logos/file-red.png}
+	\includegraphics[scale=0.02]{logos/file-red.png}
+	\includegraphics[scale=0.02]{logos/file-star-red.png}
+	\includegraphics[scale=0.02]{logos/file-red.png}
+	} ([yshift=-0.3cm] client.east |-peer2.west);
+	
+\draw[->, thick] ([yshift=0.3cm] client.east |- peer3.west) -- node[midway, above]{\texttt{Req(CID)}} ([yshift=0.3cm] peer3.west);
+\draw[->, thick] ([yshift=-0.3cm] peer3.west) -- node[midway, above]{
+	\includegraphics[scale=0.02]{logos/image.png}	
+	} ([yshift=-0.3cm] client.east |-peer3.west);
+
+\end{tikzpicture}
+\end{frame}
+
+\begin{frame}
+\frametitle{Prefix Length Selection}
+
+\begin{itemize}
+	\item Prefix Length: $l$
+	\item \texttt{k-anonymity}: The requested Provider Record can not be distinguished from at least $k-1$ other Provider Records
+	\item $k=\#CIDs\times 2^{-l}$\hspace{12em}
+	\begin{tikzpicture}[
+	thick,
+	overlay,
+	scale=0.6,
+  	every node/.style={scale=0.6},
+    level 1/.style = {sibling distance=8.8cm},
+    level 2/.style = {sibling distance=4.4cm},
+    level 3/.style = {sibling distance=2.2cm},
+    level 4/.style = {sibling distance=1.1cm},
+    level distance = 1.5cm
+]
+ 	\node[trienode] {root}
+	child {
+		node[trienode] {0}
+		child {
+			node[trienode] {00}
+			child {
+				node[trienode] {000}
+				child {
+					node[trienode] {0000}
+				}
+				child {
+					node[trienode] {0001}
+				}
+			}
+			child {
+				node[trienode] {001}
+				child {
+					node[trienode] {0010}
+				}
+				child {
+					node[trienode] {0011}
+				}
+			}
+		}
+		child {
+			node[trienode] {01}
+			child {
+				node[trienode] {010}
+				child {
+					node[trienode] {0100}
+				}
+				child {
+					node[trienode] {0101}
+				}
+			}
+			child {
+				node[trienode] {011}
+				child {
+					node[trienode] {0110}
+				}
+				child {
+					node[trienode] {0111}
+				}
+			}
+		}
+	}
+	child {
+		node[trienode] {1}
+		child {
+			node[trienode] {10}
+			child {
+				node[trienode] {100}
+				child {
+					node[trienode] {1000}
+				}
+				child {
+					node[trienode] {1001}
+				}
+			}
+			child {
+				node[trienode] {101}
+				child {
+					node[trienode] {1010}
+				}
+				child {
+					node[trienode] {1011}
+				}
+			}
+		}
+		child {
+			node[trienode] {11}
+			child {
+				node[trienode] {110}
+				child {
+					node[trienode] {1100}
+				}
+				child {
+					node[trienode] {1101}
+				}
+			}
+			child {
+				node[trienode] {111}
+				child {
+					node[trienode] {1110}
+				}
+				child {
+					node[trienode] {1111}
+				}
+			}
+		}
+	}
+  ;
+  \end{tikzpicture}
+
+	\item $\frac{\#CIDs}{k} = 2^l$
+	\item $l = log_2(\frac{\#CIDs}{k})$
+
+\end{itemize}
+\vspace{3em}
+
+\end{frame}
+
+
+\begin{frame}
+\frametitle{Privacy gains}
+
+\texttt{k-anonymity} and plausible deniability from:
+\begin{itemize}
+	\item DHT routing nodes
+	\item DHT node storing the Provider Record
+	\item Passive observers
+\end{itemize}
+
+But:
+\begin{itemize}
+	\item No \texttt{l-diversity} nor \texttt{t-closeness}
+	\item Network overhead: transmit $k$ Provider Records instead of $1$
+	\item It is easy for observers to replay the same prefix request, and resolve all Provider Records matching this prefix
+\end{itemize}
+\end{frame}
+
+\begin{frame}
+\frametitle{Privacy gains}
+\begin{tikzpicture}[
+  thick,
+  minimum size=5mm,
+  node distance=0.7cm and 3cm,
+  >=stealth,
+  bend angle=45,
+  scale=0.9,
+  every node/.style={scale=0.9},
+  auto
+]
+\node (client)  [rounded corners, align=center, draw=graylight,
+             label=above:\textbf{Client}] {
+             	\begin{minipage}[t][6.4cm]{5.8cm}
+				Request CID \texttt{bafybeif6u5pukl3sze}\\
+				\texttt{Hash(CID) = 0010101000101111}\\
+				\texttt{prefix\hspace{1.5em} = 001010100010}\\
+				Closest peer to \texttt{prefix}: \texttt{Peer0}\\
+				\end{minipage}
+             };
+             
+\node (peer0)  [rounded corners, text width=5.7cm, align=center, draw=graylight, right=of client.north east, anchor=north west,
+             label=above:\textbf{Peer0}] {
+			\sout{\texttt{Hash(CID)=0010101000101111}}\\
+			Closest peer to \texttt{prefix}: \texttt{Peer1}
+             };
+             
+\node (eye0) [above=of peer0.north east, xshift=-0.5cm, yshift=-0.8cm] {\includegraphics[scale=0.06]{logos/eye-half-red.png}};
+
+\node (peer1)  [rounded corners, text width=5.7cm, minimum height=1cm, align=center, draw=graylight, below = of peer0,
+             label=above:\textbf{Peer1}] {
+			\sout{\texttt{Hash(CID)=0010101000101111}}\\
+			Closest peer to \texttt{prefix}: \texttt{Peer2}
+             };
+
+\node (eye1) [above=of peer1.north east, xshift=-0.5cm, yshift=-0.8cm] {\includegraphics[scale=0.06]{logos/eye-half-red.png}};
+
+
+\node (peer2)  [rounded corners, text width=5.7cm, minimum height=1cm, align=center, draw=graylight, below = of peer1,
+             label=above:\textbf{Peer2}] {
+			\texttt{Provider Record} prefix matches: \\
+			\includegraphics[scale=0.02]{logos/file.png}
+			\includegraphics[scale=0.02]{logos/file.png}
+			\includegraphics[scale=0.02]{logos/file.png}
+			\includegraphics[scale=0.02]{logos/file-star.png}
+			\includegraphics[scale=0.02]{logos/file.png}
+             };
+
+\node (eye2) [above=of peer2.north east, xshift=-0.5cm, yshift=-0.8cm] {\includegraphics[scale=0.06]{logos/eye-half-red.png}};
+                          
+\node (pr)  [text width=5.7cm, minimum height=1cm, align=center, left = of peer2.south west, anchor=east] {
+             \begin{minipage}[t][2cm]{5.8cm}
+             Discard\hspace{0.5em}
+             \includegraphics[scale=0.02]{logos/file.png}
+             \includegraphics[scale=0.02]{logos/file.png}
+             \includegraphics[scale=0.02]{logos/file.png}
+             \includegraphics[scale=0.02]{logos/file.png}\\
+             \includegraphics[scale=0.02]{logos/file-star.png}\hspace{0.2em}: CID $\rightarrow$ \texttt{12D3KooWEZXjE41uU4E}\\
+             DHT lookup for \texttt{PeerID}
+			\end{minipage}
+             };
+             
+             
+\node (peer3)  [rounded corners, text width=5.7cm, minimum height=1cm, align=center, draw=graylight, below = of peer2,
+             label=above:\textbf{Content Provider}] {
+			There you go! \hspace{0.2em}\includegraphics[scale=0.02]{logos/image.png}	
+             };
+
+\node (eye3) [above=of peer3.north east, xshift=-0.5cm, yshift=-0.8cm] {\includegraphics[scale=0.06]{logos/eyes.png}};
+             
+
+\draw[->, thick] ([yshift=0.3cm] client.east |- peer0.west) -- node[midway, above]{
+	\texttt{Req(prefix)} \includegraphics[scale=0.06]{logos/eye-half-red.png}} ([yshift=0.3cm] peer0.west);
+\draw[->, thick] ([yshift=-0.3cm] peer0.west) -- node[midway, above]{\texttt{Peer1}} ([yshift=-0.3cm] client.east |-peer0.west);
+
+\draw[->, thick] ([yshift=0.3cm] client.east |- peer1.west) -- node[midway, above]{
+	\texttt{Req(prefix)} \includegraphics[scale=0.06]{logos/eye-half-red.png}} ([yshift=0.3cm] peer1.west);
+\draw[->, thick] ([yshift=-0.3cm] peer1.west) -- node[midway, above]{\texttt{Peer2}} ([yshift=-0.3cm] client.east |-peer1.west);
+
+\draw[->, thick] ([yshift=0.3cm] client.east |- peer2.west) -- node[midway, above]{
+	\texttt{Req(prefix)} \includegraphics[scale=0.06]{logos/eye-half-red.png}} ([yshift=0.3cm] peer2.west);
+\draw[->, thick] ([yshift=-0.3cm] peer2.west) -- node[midway, above]{
+	\includegraphics[scale=0.02]{logos/file.png}
+	\includegraphics[scale=0.02]{logos/file.png}
+	\includegraphics[scale=0.02]{logos/file.png}
+	\includegraphics[scale=0.02]{logos/file-star.png}
+	\includegraphics[scale=0.02]{logos/file.png}
+	} ([yshift=-0.3cm] client.east |-peer2.west);
+	
+\draw[->, thick] ([yshift=0.3cm] client.east |- peer3.west) -- node[midway, above]{\texttt{Req(CID)}} ([yshift=0.3cm] peer3.west);
+\draw[->, thick] ([yshift=-0.3cm] peer3.west) -- node[midway, above]{
+	\includegraphics[scale=0.02]{logos/image.png}	
+	} ([yshift=-0.3cm] client.east |-peer3.west);
+
+\end{tikzpicture}
+\end{frame}
+
+\begin{frame}
+\frametitle{Provider Records Encryption}
+\begin{itemize}
+	\item Provider Records encrypted before pinning
+	\item Symmetric encrypted e.g \texttt{AES-256}
+	\item $key = KDF(CID)$
+	\item Having access to \texttt{Hash(CID)} is not enough to read the Provider Record
+	\item Only nodes knowing the CID can read the Provider Record
+\end{itemize}
+\end{frame}
+
+\begin{frame}
+\frametitle{Provider Records Encryption}
+\begin{tikzpicture}[
+  thick,
+  minimum size=5mm,
+  node distance=0.7cm and 3cm,
+  >=stealth,
+  bend angle=45,
+  scale=0.9,
+  every node/.style={scale=0.9},
+  auto
+]
+\node (client)  [rounded corners, align=center, draw=graylight,
+             label=above:\textbf{Client}] {
+             	\begin{minipage}[t][6.4cm]{5.8cm}
+				Request CID \texttt{bafybeif6u5pukl3sze}\\
+				\texttt{Hash(CID) = 0010101000101111}\\
+				\texttt{prefix\hspace{1.5em} = 001010100010}\\
+				Closest peer to \texttt{prefix}: \texttt{Peer0}\\
+				\end{minipage}
+             };
+             
+\node (peer0)  [rounded corners, text width=5.7cm, align=center, draw=graylight, right=of client.north east, anchor=north west,
+             label=above:\textbf{Peer0}] {
+			\sout{\texttt{Hash(CID)=0010101000101111}}\\
+			Closest peer to \texttt{prefix}: \texttt{Peer1}
+             };
+             
+\node (eye0) [above=of peer0.north east, xshift=-0.5cm, yshift=-0.8cm] {\includegraphics[scale=0.06]{logos/eye-half.png}};
+
+\node (peer1)  [rounded corners, text width=5.7cm, minimum height=1cm, align=center, draw=graylight, below = of peer0,
+             label=above:\textbf{Peer1}] {
+			\sout{\texttt{Hash(CID)=0010101000101111}}\\
+			Closest peer to \texttt{prefix}: \texttt{Peer2}
+             };
+
+\node (eye1) [above=of peer1.north east, xshift=-0.5cm, yshift=-0.8cm] {\includegraphics[scale=0.06]{logos/eye-half.png}};
+
+
+\node (peer2)  [rounded corners, text width=5.7cm, minimum height=1cm, align=center, draw=graylight, below = of peer1,
+             label=above:\textbf{Peer2}] {
+			\texttt{Provider Record} prefix matches: \\
+			\includegraphics[scale=0.02]{logos/file-enc-red.png}
+			\includegraphics[scale=0.02]{logos/file-enc-red.png}
+			\includegraphics[scale=0.02]{logos/file-enc-red.png}
+			\includegraphics[scale=0.02]{logos/file-star-enc-red.png}
+			\includegraphics[scale=0.02]{logos/file-enc-red.png}
+             };
+
+\node (eye2) [above=of peer2.north east, xshift=-0.5cm, yshift=-0.8cm] {\includegraphics[scale=0.06]{logos/eye-half.png}};
+                          
+\node (pr)  [text width=5.7cm, minimum height=1cm, align=center, left = of peer2.south west, anchor=east] {
+             \begin{minipage}[t][2cm]{5.8cm}
+             Discard\hspace{0.5em}
+             \includegraphics[scale=0.02]{logos/file-enc-red.png}
+             \includegraphics[scale=0.02]{logos/file-enc-red.png}
+             \includegraphics[scale=0.02]{logos/file-enc-red.png}
+             \includegraphics[scale=0.02]{logos/file-enc-red.png}\\
+             {\color{coolred}$key = KDF(CID)$\\
+             Decrypt \includegraphics[scale=0.02]{logos/file-star-enc-red.png}\hspace{0.2em} using $key$}\\CID $\rightarrow$ \texttt{12D3KooWEZXjE41uU4E}\\
+             DHT lookup for \texttt{PeerID}
+			\end{minipage}
+             };
+             
+             
+\node (peer3)  [rounded corners, text width=5.7cm, minimum height=1cm, align=center, draw=graylight, below = of peer2,
+             label=above:\textbf{Content Provider}] {
+			There you go! \hspace{0.2em}\includegraphics[scale=0.02]{logos/image.png}	
+             };
+
+\node (eye3) [above=of peer3.north east, xshift=-0.5cm, yshift=-0.8cm] {\includegraphics[scale=0.06]{logos/eyes.png}};
+             
+
+\draw[->, thick] ([yshift=0.3cm] client.east |- peer0.west) -- node[midway, above]{
+	\texttt{Req(prefix)} \includegraphics[scale=0.06]{logos/eye-half.png}} ([yshift=0.3cm] peer0.west);
+\draw[->, thick] ([yshift=-0.3cm] peer0.west) -- node[midway, above]{\texttt{Peer1}} ([yshift=-0.3cm] client.east |-peer0.west);
+
+\draw[->, thick] ([yshift=0.3cm] client.east |- peer1.west) -- node[midway, above]{
+	\texttt{Req(prefix)} \includegraphics[scale=0.06]{logos/eye-half.png}} ([yshift=0.3cm] peer1.west);
+\draw[->, thick] ([yshift=-0.3cm] peer1.west) -- node[midway, above]{\texttt{Peer2}} ([yshift=-0.3cm] client.east |-peer1.west);
+
+\draw[->, thick] ([yshift=0.3cm] client.east |- peer2.west) -- node[midway, above]{
+	\texttt{Req(prefix)} \includegraphics[scale=0.06]{logos/eye-half.png}} ([yshift=0.3cm] peer2.west);
+\draw[->, thick] ([yshift=-0.3cm] peer2.west) -- node[midway, above]{
+	\includegraphics[scale=0.02]{logos/file-enc-red.png}
+	\includegraphics[scale=0.02]{logos/file-enc-red.png}
+	\includegraphics[scale=0.02]{logos/file-enc-red.png}
+	\includegraphics[scale=0.02]{logos/file-star-enc-red.png}
+	\includegraphics[scale=0.02]{logos/file-enc-red.png}
+	} ([yshift=-0.3cm] client.east |-peer2.west);
+	
+\draw[->, thick] ([yshift=0.3cm] client.east |- peer3.west) -- node[midway, above]{\texttt{Req(CID)}} ([yshift=0.3cm] peer3.west);
+\draw[->, thick] ([yshift=-0.3cm] peer3.west) -- node[midway, above]{
+	\includegraphics[scale=0.02]{logos/image.png}	
+	} ([yshift=-0.3cm] client.east |-peer3.west);
+
+\end{tikzpicture}
+\end{frame}
+
+\begin{frame}
+\frametitle{Privacy Gains}
+\begin{itemize}
+	\item Observers can only decrypt the Provider Records of which they know the CID
+	\item DHT nodes storing the Provider Records don't know the accessed Provider Record
+	\item Bonus: The Content Provider gains privacy from the DHT nodes storing the Provider Record
+	\bigskip
+	\item Downside: The client has to perform one decryption operation
+\end{itemize}
+\end{frame}
+
+\begin{frame}
+\frametitle{Privacy Gains}
+\begin{tikzpicture}[
+  thick,
+  minimum size=5mm,
+  node distance=0.7cm and 3cm,
+  >=stealth,
+  bend angle=45,
+  scale=0.9,
+  every node/.style={scale=0.9},
+  auto
+]
+\node (client)  [rounded corners, align=center, draw=graylight,
+             label=above:\textbf{Client}] {
+             	\begin{minipage}[t][6.4cm]{5.8cm}
+				Request CID \texttt{bafybeif6u5pukl3sze}\\
+				\texttt{Hash(CID) = 0010101000101111}\\
+				\texttt{prefix\hspace{1.5em} = 001010100010}\\
+				Closest peer to \texttt{prefix}: \texttt{Peer0}\\
+				\end{minipage}
+             };
+             
+\node (peer0)  [rounded corners, text width=5.7cm, align=center, draw=graylight, right=of client.north east, anchor=north west,
+             label=above:\textbf{Peer0}] {
+			\sout{\texttt{Hash(CID)=0010101000101111}}\\
+			Closest peer to \texttt{prefix}: \texttt{Peer1}
+             };
+             
+\node (eye0) [above=of peer0.north east, xshift=-0.5cm, yshift=-0.8cm] {\includegraphics[scale=0.06]{logos/eye-quarter-red.png}};
+
+\node (peer1)  [rounded corners, text width=5.7cm, minimum height=1cm, align=center, draw=graylight, below = of peer0,
+             label=above:\textbf{Peer1}] {
+			\sout{\texttt{Hash(CID)=0010101000101111}}\\
+			Closest peer to \texttt{prefix}: \texttt{Peer2}
+             };
+
+\node (eye1) [above=of peer1.north east, xshift=-0.5cm, yshift=-0.8cm] {\includegraphics[scale=0.06]{logos/eye-quarter-red.png}};
+
+
+\node (peer2)  [rounded corners, text width=5.7cm, minimum height=1cm, align=center, draw=graylight, below = of peer1,
+             label=above:\textbf{Peer2}] {
+			\texttt{Provider Record} prefix matches: \\
+			\includegraphics[scale=0.02]{logos/file-enc.png}
+			\includegraphics[scale=0.02]{logos/file-enc.png}
+			\includegraphics[scale=0.02]{logos/file-enc.png}
+			\includegraphics[scale=0.02]{logos/file-star-enc.png}
+			\includegraphics[scale=0.02]{logos/file-enc.png}
+             };
+
+\node (eye2) [above=of peer2.north east, xshift=-0.5cm, yshift=-0.8cm] {\includegraphics[scale=0.06]{logos/eye-quarter-red.png}};
+                          
+\node (pr)  [text width=5.7cm, minimum height=1cm, align=center, left = of peer2.south west, anchor=east] {
+             \begin{minipage}[t][2cm]{5.8cm}
+             Discard\hspace{0.5em}
+             \includegraphics[scale=0.02]{logos/file-enc.png}
+             \includegraphics[scale=0.02]{logos/file-enc.png}
+             \includegraphics[scale=0.02]{logos/file-enc.png}
+             \includegraphics[scale=0.02]{logos/file-enc.png}\\
+             $key = KDF(CID)$\\
+             Decrypt \includegraphics[scale=0.02]{logos/file-star-enc.png}\hspace{0.2em} using $key$\\CID $\rightarrow$ \texttt{12D3KooWEZXjE41uU4E}\\
+             DHT lookup for \texttt{PeerID}
+			\end{minipage}
+             };
+             
+             
+\node (peer3)  [rounded corners, text width=5.7cm, minimum height=1cm, align=center, draw=graylight, below = of peer2,
+             label=above:\textbf{Content Provider}] {
+			There you go! \hspace{0.2em}\includegraphics[scale=0.02]{logos/image.png}	
+             };
+
+\node (eye3) [above=of peer3.north east, xshift=-0.5cm, yshift=-0.8cm] {\includegraphics[scale=0.06]{logos/eyes.png}};
+             
+
+\draw[->, thick] ([yshift=0.3cm] client.east |- peer0.west) -- node[midway, above]{
+	\texttt{Req(prefix)} \includegraphics[scale=0.06]{logos/eye-quarter-red.png}} ([yshift=0.3cm] peer0.west);
+\draw[->, thick] ([yshift=-0.3cm] peer0.west) -- node[midway, above]{\texttt{Peer1}} ([yshift=-0.3cm] client.east |-peer0.west);
+
+\draw[->, thick] ([yshift=0.3cm] client.east |- peer1.west) -- node[midway, above]{
+	\texttt{Req(prefix)} \includegraphics[scale=0.06]{logos/eye-quarter-red.png}} ([yshift=0.3cm] peer1.west);
+\draw[->, thick] ([yshift=-0.3cm] peer1.west) -- node[midway, above]{\texttt{Peer2}} ([yshift=-0.3cm] client.east |-peer1.west);
+
+\draw[->, thick] ([yshift=0.3cm] client.east |- peer2.west) -- node[midway, above]{
+	\texttt{Req(prefix)} \includegraphics[scale=0.06]{logos/eye-quarter-red.png}} ([yshift=0.3cm] peer2.west);
+\draw[->, thick] ([yshift=-0.3cm] peer2.west) -- node[midway, above]{
+	\includegraphics[scale=0.02]{logos/file-enc.png}
+	\includegraphics[scale=0.02]{logos/file-enc.png}
+	\includegraphics[scale=0.02]{logos/file-enc.png}
+	\includegraphics[scale=0.02]{logos/file-star-enc.png}
+	\includegraphics[scale=0.02]{logos/file-enc.png}
+	} ([yshift=-0.3cm] client.east |-peer2.west);
+	
+\draw[->, thick] ([yshift=0.3cm] client.east |- peer3.west) -- node[midway, above]{\texttt{Req(CID)}} ([yshift=0.3cm] peer3.west);
+\draw[->, thick] ([yshift=-0.3cm] peer3.west) -- node[midway, above]{
+	\includegraphics[scale=0.02]{logos/image.png}	
+	} ([yshift=-0.3cm] client.east |-peer3.west);
+
+\end{tikzpicture}
+\end{frame}
+
+
+\begin{frame}
+\frametitle{Privacy Gains}
+\begin{tikzpicture}[
+  thick,
+  minimum size=5mm,
+  node distance=0.7cm and 3cm,
+  >=stealth,
+  bend angle=45,
+  scale=0.9,
+  every node/.style={scale=0.9},
+  auto
+]
+\node (client)  [rounded corners, align=center, draw=graylight,
+             label=above:\textbf{Client}] {
+             	\begin{minipage}[t][6.4cm]{5.8cm}
+				Request CID \texttt{bafybeif6u5pukl3sze}\\
+				\texttt{Hash(CID) = 0010101000101111}\\
+				\texttt{prefix\hspace{1.5em} = 001010100010}\\
+				Closest peer to \texttt{prefix}: \texttt{Peer0}\\
+				\end{minipage}
+             };
+             
+\node (peer0)  [rounded corners, text width=5.7cm, align=center, draw=graylight, right=of client.north east, anchor=north west,
+             label=above:\textbf{Peer0}] {
+			\sout{\texttt{Hash(CID)=0010101000101111}}\\
+			Closest peer to \texttt{prefix}: \texttt{Peer1}
+             };
+             
+\node (eye0) [above=of peer0.north east, xshift=-0.5cm, yshift=-0.8cm] {\includegraphics[scale=0.06]{logos/eye-quarter.png}};
+
+\node (peer1)  [rounded corners, text width=5.7cm, minimum height=1cm, align=center, draw=graylight, below = of peer0,
+             label=above:\textbf{Peer1}] {
+			\sout{\texttt{Hash(CID)=0010101000101111}}\\
+			Closest peer to \texttt{prefix}: \texttt{Peer2}
+             };
+
+\node (eye1) [above=of peer1.north east, xshift=-0.5cm, yshift=-0.8cm] {\includegraphics[scale=0.06]{logos/eye-quarter.png}};
+
+
+\node (peer2)  [rounded corners, text width=5.7cm, minimum height=1cm, align=center, draw=graylight, below = of peer1,
+             label=above:\textbf{Peer2}] {
+			\texttt{Provider Record} prefix matches: \\
+			\includegraphics[scale=0.02]{logos/file-enc.png}
+			\includegraphics[scale=0.02]{logos/file-enc.png}
+			\includegraphics[scale=0.02]{logos/file-enc.png}
+			\includegraphics[scale=0.02]{logos/file-star-enc.png}
+			\includegraphics[scale=0.02]{logos/file-enc.png}
+             };
+
+\node (eye2) [above=of peer2.north east, xshift=-0.5cm, yshift=-0.8cm] {\includegraphics[scale=0.06]{logos/eye-quarter.png}};
+                          
+\node (pr)  [text width=5.7cm, minimum height=1cm, align=center, left = of peer2.south west, anchor=east] {
+             \begin{minipage}[t][2cm]{5.8cm}
+             Discard\hspace{0.5em}
+             \includegraphics[scale=0.02]{logos/file-enc.png}
+             \includegraphics[scale=0.02]{logos/file-enc.png}
+             \includegraphics[scale=0.02]{logos/file-enc.png}
+             \includegraphics[scale=0.02]{logos/file-enc.png}\\
+             $key = KDF(CID)$\\
+             Decrypt \includegraphics[scale=0.02]{logos/file-star-enc.png}\hspace{0.2em} using $key$\\CID $\rightarrow$ \texttt{12D3KooWEZXjE41uU4E}\\
+             DHT lookup for \texttt{PeerID}
+			\end{minipage}
+             };
+             
+             
+\node (peer3)  [rounded corners, text width=5.7cm, minimum height=1cm, align=center, draw=graylight, below = of peer2,
+             label=above:\textbf{Content Provider}] {
+			There you go! \hspace{0.2em}\includegraphics[scale=0.02]{logos/image.png}	
+             };
+
+\node (eye3) [above=of peer3.north east, xshift=-0.5cm, yshift=-0.8cm] {\includegraphics[scale=0.06]{logos/eyes.png}};
+             
+
+\draw[->, thick] ([yshift=0.3cm] client.east |- peer0.west) -- node[midway, above]{
+	\texttt{Req(prefix)} \includegraphics[scale=0.06]{logos/eye-quarter.png}} ([yshift=0.3cm] peer0.west);
+\draw[->, thick] ([yshift=-0.3cm] peer0.west) -- node[midway, above]{\texttt{Peer1}} ([yshift=-0.3cm] client.east |-peer0.west);
+
+\draw[->, thick] ([yshift=0.3cm] client.east |- peer1.west) -- node[midway, above]{
+	\texttt{Req(prefix)} \includegraphics[scale=0.06]{logos/eye-quarter.png}} ([yshift=0.3cm] peer1.west);
+\draw[->, thick] ([yshift=-0.3cm] peer1.west) -- node[midway, above]{\texttt{Peer2}} ([yshift=-0.3cm] client.east |-peer1.west);
+
+\draw[->, thick] ([yshift=0.3cm] client.east |- peer2.west) -- node[midway, above]{
+	\texttt{Req(prefix)} \includegraphics[scale=0.06]{logos/eye-quarter.png}} ([yshift=0.3cm] peer2.west);
+\draw[->, thick] ([yshift=-0.3cm] peer2.west) -- node[midway, above]{
+	\includegraphics[scale=0.02]{logos/file-enc.png}
+	\includegraphics[scale=0.02]{logos/file-enc.png}
+	\includegraphics[scale=0.02]{logos/file-enc.png}
+	\includegraphics[scale=0.02]{logos/file-star-enc.png}
+	\includegraphics[scale=0.02]{logos/file-enc.png}
+	} ([yshift=-0.3cm] client.east |-peer2.west);
+	
+\draw[->, thick] ([yshift=0.3cm] client.east |- peer3.west) -- node[midway, above]{\texttt{Req(CID)}} ([yshift=0.3cm] peer3.west);
+\draw[->, thick] ([yshift=-0.3cm] peer3.west) -- node[midway, above]{
+	\includegraphics[scale=0.02]{logos/image.png}	
+	} ([yshift=-0.3cm] client.east |-peer3.west);
+
+\end{tikzpicture}
+\end{frame}
+
+\begin{frame}
+\frametitle{Conclusion}
+\begin{itemize}
+	\item We can significantly improve privacy in the DHT!
+	\item DHT servers don't need to hash the CID for every request
+	\item Network overhead: sending $k$ Provider Records instead of $1$
+	\item Computation overhead: one symmetric decryption for the Provider Record
+	\item Require to modify the server code and republish all Provider Records
+	\item Illusion of privacy
+\end{itemize}
+\end{frame}
+
+\iffalse
+\begin{frame}
+\frametitle{References}
+\begin{enumerate}
+	\item \hyperlink{https://www.notion.so/protocollabs/libp2p-DHT-privacy-Partial-CID-review-and-follow-up-bf4c2748eec34ad48e2e60c28e61fafb}{Notion page}
+	\item \hyperlink{https://ipfs.io/ipfs/QmaVrnwZrnoG4YramcN75mbE5AUfCymiEErrHGXoQR968V}{Kademlia Paper} by Petar Maymounkov and David Mazières
+\end{enumerate}
+\end{frame}
+\fi
+
+
+\end{document}

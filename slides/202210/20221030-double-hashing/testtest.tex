@@ -1,0 +1,28 @@
+\documentclass{article}                          
+
+\def\recursion#1#2{%
+  \ifnum#1>#2
+   \expandafter\eatv
+  \else
+    {#1}%
+  \fi
+  \expandafter\recursion\expandafter{\the\numexpr#1+1\relax}{#2}%
+}
+
+\def\minus#1#2{%
+	{#1}
+	\ifnum#1>#2
+		\expandafter\eatv
+	\else
+		{#1}
+	\fi
+  \expandafter\recursion\expandafter{\the\numexpr#1-1\relax}{#2}%
+}
+
+\def\eatv#1#2#3#4#5{}
+
+\begin{document}
+
+\recursion{10}{0}
+
+\end{document}
