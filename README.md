@@ -1,2 +1,3 @@
-# ipfs-slides
-My IPFS related slides
+# IPFS Slides
+
+My IPFS related slides, written in Latex.
